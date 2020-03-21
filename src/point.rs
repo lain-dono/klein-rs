@@ -64,7 +64,7 @@ impl Point {
     /// Normalize this point (division is done via rcpps with an additional Newton-Raphson refinement).
     pub fn normalize(&mut self) {
         unsafe {
-            let tmp = crate::arch::rcp_nr1(swizzle!(self.p3, 0, 0, 0, 0));
+            let tmp = crate::arch::rcp_nr1(swizzle!(self.p3, 0, 0, 0, 0).into()).0;
             self.p3 = _mm_mul_ps(self.p3, tmp);
         }
     }
@@ -77,7 +77,7 @@ impl Point {
 
     pub fn invert(&mut self) {
         unsafe {
-            let inv_norm = crate::arch::rcp_nr1(swizzle!(self.p3, 0, 0, 0, 0));
+            let inv_norm = crate::arch::rcp_nr1(swizzle!(self.p3, 0, 0, 0, 0).into()).0;
             self.p3 = _mm_mul_ps(inv_norm, self.p3);
             self.p3 = _mm_mul_ps(inv_norm, self.p3);
         }

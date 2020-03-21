@@ -4,15 +4,13 @@
 mod sse;
 
 mod exp_log;
-mod exterior_product;
 mod geometric_product;
 mod inner_product;
 mod matrix;
 mod sandwitch;
 
 pub use self::{
-    exp_log::*, exterior_product::*, geometric_product::*, inner_product::*, matrix::*,
-    sandwitch::*, sse::*,
+    exp_log::*, geometric_product::*, inner_product::*, matrix::*, sandwitch::*, sse::*,
 };
 
 use core::arch::x86_64::*;
@@ -63,27 +61,27 @@ impl Into<__m128> for f32x4 {
     }
 }
 
-impl std::ops::Add for f32x4 {
-    type Output = Self;
-    #[inline(always)]
-    fn add(self, other: Self) -> Self {
-        Self(unsafe { _mm_add_ps(self.0, other.0) })
-    }
+macro_rules! impl_bin_add {
+    ($op:ident :: $fn:ident => $simd:ident) => {
+        impl std::ops::$op for f32x4 {
+            type Output = Self;
+            #[inline(always)]
+            fn $fn(self, other: Self) -> Self {
+                Self(unsafe { $simd(self.0, other.0) })
+            }
+        }
+    };
 }
 
-impl std::ops::Sub for f32x4 {
-    type Output = Self;
-    #[inline(always)]
-    fn sub(self, other: Self) -> Self {
-        Self(unsafe { _mm_sub_ps(self.0, other.0) })
-    }
-}
+impl_bin_add!(Add::add => _mm_add_ps);
+impl_bin_add!(Sub::sub => _mm_sub_ps);
+impl_bin_add!(Mul::mul => _mm_mul_ps);
 
 impl std::ops::Mul<f32> for f32x4 {
     type Output = Self;
     #[inline(always)]
     fn mul(self, s: f32) -> Self {
-        Self(unsafe { _mm_mul_ps(self.0, _mm_set1_ps(s)) })
+        self * Self::all(s)
     }
 }
 
@@ -91,7 +89,7 @@ impl std::ops::Div<f32> for f32x4 {
     type Output = Self;
     #[inline(always)]
     fn div(self, s: f32) -> Self {
-        Self(unsafe { _mm_mul_ps(self.0, rcp_nr1(_mm_set1_ps(s))) })
+        self * Self::all(s).rcp_nr1()
     }
 }
 
@@ -148,7 +146,34 @@ impl f32x4 {
     }
 
     #[inline(always)]
-    pub fn rcp_nr1(self) -> Self {
-        Self(unsafe { rcp_nr1(self.0) })
+    pub fn into_simd(self) -> __m128 {
+        self.0
     }
+
+    #[inline(always)]
+    pub fn from_simd(simd: __m128) -> Self {
+        Self(simd)
+    }
+
+    #[inline(always)]
+    pub fn rcp_nr1(self) -> Self {
+        rcp_nr1(self)
+    }
+
+    pub fn movehdup(self) -> Self {
+        Self::from(unsafe { _mm_movehdup_ps(self.0) })
+    }
+
+    pub fn dp(a: Self, b: Self) -> Self {
+        Self(unsafe { dp(a.0, b.0) })
+    }
+
+    pub fn hi_dp(a: Self, b: Self) -> Self {
+        Self(unsafe { hi_dp(a.0, b.0) })
+    }
+
+    pub fn hi_dp_ss(a: Self, b: Self) -> Self {
+        Self(unsafe { hi_dp_ss(a.0, b.0) })
+    }
+
 }

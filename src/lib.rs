@@ -7,10 +7,11 @@ pub mod arch;
 mod geometric_product;
 mod inner_product;
 mod join;
-mod meet;
 
-mod direction; // done
-mod dual; // done
+mod multivector_ep;
+
+mod direction; // done f32x4
+mod dual; // done scalar
 mod line; // done
 mod matrix;
 mod motor;

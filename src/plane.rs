@@ -43,7 +43,7 @@ impl Plane {
     /// requires that the planes are normalized.
     pub fn normalize(&mut self) {
         unsafe {
-            use crate::arch::{rsqrt_nr1, hi_dp_bc};
+            use crate::arch::{hi_dp_bc, rsqrt_nr1};
             let inv_norm = rsqrt_nr1(hi_dp_bc(self.p0, self.p0));
             let inv_norm = if cfg!(target_feature = "sse4.1") {
                 _mm_blend_ps(inv_norm, _mm_set_ss(1.0), 1)
@@ -109,11 +109,7 @@ impl Plane {
     /// performed via this call operator is an optimized routine equivalent to
     /// the expression $p_1 p_2 p_1$.
     pub fn plane_reflect_plane(self, p: &Self) -> Self {
-        unsafe {
-            let mut out: Self = core::mem::uninitialized();
-            crate::arch::sw00(self.p0, p.p0, &mut out.p0);
-            out
-        }
+        Plane::from(crate::arch::sw00(self.p0.into(), p.p0.into()).0)
     }
 
     /// Reflect line $\ell$ through this plane $p$. The operation
@@ -134,10 +130,6 @@ impl Plane {
     /// performed via this call operator is an optimized routine equivalent to
     /// the expression $p P p$.
     pub fn plane_reflect_point(self, p: &Point) -> Point {
-        unsafe {
-            let mut out: Point = core::mem::uninitialized();
-            crate::arch::sw30(self.p0, p.p3, &mut out.p3);
-            out
-        }
+        Point::from(unsafe { crate::arch::sw30(self.p0, p.p3) })
     }
 }

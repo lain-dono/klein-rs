@@ -24,32 +24,33 @@ use core::arch::x86_64::*;
 // Reflect a plane through another plane
 // b * a * b
 #[inline(always)]
-pub unsafe fn sw00(a: __m128, b: __m128, p0_out: &mut __m128) {
+pub fn sw00(a: f32x4, b: f32x4) -> f32x4 {
     // (2a0(a2 b2 + a3 b3 + a1 b1) - b0(a1^2 + a2^2 + a3^2)) e0 +
     // (2a1(a2 b2 + a3 b3)         + b1(a1^2 - a2^2 - a3^2)) e1 +
     // (2a2(a3 b3 + a1 b1)         + b2(a2^2 - a3^2 - a1^2)) e2 +
     // (2a3(a1 b1 + a2 b2)         + b3(a3^2 - a1^2 - a2^2)) e3
 
-    let a_zzwy = swizzle!(a, 1, 3, 2, 2);
-    let a_wwyz = swizzle!(a, 2, 1, 3, 3);
+    let a_zzwy = f32x4_swizzle!(a, 1, 3, 2, 2);
+    let a_wwyz = f32x4_swizzle!(a, 2, 1, 3, 3);
 
     // Left block
-    let tmp = _mm_mul_ps(a_zzwy, swizzle!(b, 1, 3, 2, 2));
-    let tmp = _mm_add_ps(tmp, _mm_mul_ps(a_wwyz, swizzle!(b, 2, 1, 3, 3)));
+    let left = a_zzwy * f32x4_swizzle!(b, 1, 3, 2, 2) + a_wwyz * f32x4_swizzle!(b, 2, 1, 3, 3);
 
-    let a1 = _mm_movehdup_ps(a);
-    let b1 = _mm_movehdup_ps(b);
-    let tmp = _mm_add_ss(tmp, _mm_mul_ss(a1, b1));
-    let tmp = _mm_mul_ps(tmp, _mm_add_ps(a, a));
+    let a1: f32x4 = a.movehdup();
+    let b1: f32x4 = b.movehdup();
+    let left = (left + a1 * b1) * (a + a);
+
+    let a = f32x4::from(a);
+    let a_zzwy = f32x4::from(a_zzwy);
+    let a_wwyz = f32x4::from(a_wwyz);
 
     // Right block
-    let a_yyzw = swizzle!(a, 3, 2, 1, 1);
-    let tmp2 = _mm_xor_ps(_mm_mul_ps(a_yyzw, a_yyzw), _mm_set_ss(-0.0));
-    let tmp2 = _mm_sub_ps(tmp2, _mm_mul_ps(a_zzwy, a_zzwy));
-    let tmp2 = _mm_sub_ps(tmp2, _mm_mul_ps(a_wwyz, a_wwyz));
-    let tmp2 = _mm_mul_ps(tmp2, b);
+    let a_yyzw = f32x4_swizzle!(a, 3, 2, 1, 1);
+    let tmp2 = (a_yyzw * a_yyzw) ^ f32x4::all(-0.0);
+    let tmp2 = tmp2 - a_zzwy * a_zzwy;
+    let tmp2 = tmp2 - a_wwyz * a_wwyz;
 
-    *p0_out = _mm_add_ps(tmp, tmp2);
+    left + tmp2 * b
 }
 
 #[inline(always)]
@@ -114,7 +115,7 @@ pub unsafe fn sw20(a: __m128, b: __m128, p2: &mut __m128) {
 }
 
 #[inline(always)]
-pub unsafe fn sw30(a: __m128, b: __m128, p3_out: &mut __m128) {
+pub unsafe fn sw30(a: __m128, b: __m128) -> __m128 {
     //                                b0(a1^2 + a2^2 + a3^2)  e123 +
     // (-2a1(a0 b0 + a3 b3 + a2 b2) + b1(a2^2 + a3^2 - a1^2)) e032 +
     // (-2a2(a0 b0 + a1 b1 + a3 b3) + b2(a3^2 + a1^2 - a2^2)) e013 +
@@ -123,10 +124,10 @@ pub unsafe fn sw30(a: __m128, b: __m128, p3_out: &mut __m128) {
     let a_zwyz = swizzle!(a, 2, 1, 3, 2);
     let a_yzwy = swizzle!(a, 1, 3, 2, 1);
 
-    *p3_out = _mm_mul_ps(swizzle!(a, 0, 0, 0, 0), swizzle!(b, 0, 0, 0, 0));
-    *p3_out = _mm_add_ps(*p3_out, _mm_mul_ps(a_zwyz, swizzle!(b, 2, 1, 3, 0)));
-    *p3_out = _mm_add_ps(*p3_out, _mm_mul_ps(a_yzwy, swizzle!(b, 1, 3, 2, 0)));
-    *p3_out = _mm_mul_ps(*p3_out, _mm_mul_ps(a, _mm_set_ps(-2.0, -2.0, -2.0, 0.0)));
+    let p3 = _mm_mul_ps(swizzle!(a, 0, 0, 0, 0), swizzle!(b, 0, 0, 0, 0));
+    let p3 = _mm_add_ps(p3, _mm_mul_ps(a_zwyz, swizzle!(b, 2, 1, 3, 0)));
+    let p3 = _mm_add_ps(p3, _mm_mul_ps(a_yzwy, swizzle!(b, 1, 3, 2, 0)));
+    let p3 = _mm_mul_ps(p3, _mm_mul_ps(a, _mm_set_ps(-2.0, -2.0, -2.0, 0.0)));
 
     let tmp = _mm_mul_ps(a_yzwy, a_yzwy);
     let tmp = _mm_add_ps(tmp, _mm_mul_ps(a_zwyz, a_zwyz));
@@ -136,7 +137,7 @@ pub unsafe fn sw30(a: __m128, b: __m128, p3_out: &mut __m128) {
         _mm_xor_ps(_mm_mul_ps(a_wyzw, a_wyzw), _mm_set_ss(-0.0)),
     );
 
-    *p3_out = _mm_add_ps(*p3_out, _mm_mul_ps(b, tmp));
+    _mm_add_ps(p3, _mm_mul_ps(b, tmp))
 }
 
 // Apply a translator to a plane.
@@ -169,7 +170,7 @@ pub unsafe fn sw02(a: __m128, b: __m128) -> __m128 {
     // a1*b1 + a2*b2 + a3*b3 stored in the low component of tmp
     let tmp = hi_dp(a, b);
 
-    let inv_b = rcp_nr1(b);
+    let inv_b = rcp_nr1(b.into()).0;
     // 2 / b0
     let inv_b = _mm_add_ss(inv_b, inv_b);
     let inv_b = _mm_and_ps(inv_b, _mm_castsi128_ps(_mm_set_epi32(0, 0, 0, -1)));

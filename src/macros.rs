@@ -55,6 +55,52 @@ macro_rules! derive_debug {
 }
 
 macro_rules! derive_conv {
+    ($ty:ident { $a:ident: $simd:ty }) => {
+        derive_conv!(__m128  $ty { $a });
+        derive_conv!(f32x4  $ty { $a });
+    };
+
+    ($ty:ident { $a:ident: $simd:ty, $b:ident: $simd2:ty }) => {
+        derive_conv!(__m128  $ty { $a, $b });
+        derive_conv!(f32x4  $ty { $a, $b });
+    };
+
+    ($simd:ident $ty:ident { $a:ident }) => {
+        #[doc(hidden)]
+        impl From<$simd> for $ty {
+            #[inline(always)]
+            fn from($a: $simd) -> Self {
+                Self { $a: $a.into() }
+            }
+        }
+
+        #[doc(hidden)]
+        impl Into<$simd> for $ty {
+            #[inline(always)]
+            fn into(self) -> $simd {
+                self.$a.into()
+            }
+        }
+    };
+
+    ($simd:ident $ty:ident { $a:ident, $b:ident }) => {
+        #[doc(hidden)]
+        impl From<($simd, $simd)> for $ty {
+            #[inline(always)]
+            fn from(($a, $b): ($simd, $simd)) -> Self {
+                Self { $a: $a.into(), $b: $b.into() }
+            }
+        }
+
+        #[doc(hidden)]
+        impl Into<($simd, $simd)> for $ty {
+            #[inline(always)]
+            fn into(self) -> ($simd, $simd) {
+                (self.$a.into(), self.$b.into())
+            }
+        }
+    };
+
     ($ty:ident { $( $field:ident: $simd:ty ),+ }) => {
         #[doc(hidden)]
         #[allow(unused_parens)]
@@ -161,7 +207,7 @@ macro_rules! derive_ops {
             type Output = Self;
             #[inline(always)]
             fn div(self, s: f32) -> Self::Output {
-                let s = unsafe { crate::arch::rcp_nr1(_mm_set1_ps(s)) };
+                let s = f32x4::all(s).rcp_nr1().0;
                 Self {
                     $($field: unsafe { _mm_mul_ps(self.$field, s) }),+
                 }

@@ -231,7 +231,7 @@ impl Line {
             let b2 = crate::arch::hi_dp_bc(self.p1, self.p1);
             let s = crate::arch::rsqrt_nr1(b2);
             let bc = crate::arch::hi_dp_bc(self.p1, self.p2);
-            let t = _mm_mul_ps(_mm_mul_ps(bc, crate::arch::rcp_nr1(b2)), s);
+            let t = _mm_mul_ps(_mm_mul_ps(bc, crate::arch::rcp_nr1(b2.into()).0), s);
 
             // p1 * (s + t e0123) = s * p1 - t p1_perp
             let tmp = _mm_mul_ps(self.p2, s);
@@ -252,7 +252,7 @@ impl Line {
             let b2 = crate::arch::hi_dp_bc(self.p1, self.p1);
             let s = crate::arch::rsqrt_nr1(b2);
             let bc = crate::arch::hi_dp_bc(self.p1, self.p2);
-            let b2_inv = crate::arch::rcp_nr1(b2);
+            let b2_inv = crate::arch::rcp_nr1(b2.into()).0;
             let t = _mm_mul_ps(_mm_mul_ps(bc, b2_inv), s);
             let neg = _mm_set_ps(-0.0, -0.0, -0.0, 0.0);
 

@@ -15,12 +15,11 @@ use core::arch::x86_64::*;
 // that it is neither purely real nor purely ideal.
 // Exponentiates the bivector and returns the motor defined by partitions 1 and 2.
 #[inline(always)]
-pub unsafe fn exp(a: __m128, b: __m128, p1_out: &mut __m128, p2_out: &mut __m128) {
+pub unsafe fn exp(a: __m128, b: __m128) -> (__m128, __m128) {
     // The exponential map produces a continuous group of rotations about an
     // axis. We'd *like* to evaluate the exp(a + b) as exp(a)exp(b) but we
     // cannot do that in general because a and b do not commute (consider
-    // the differences between the Taylor expansion of exp(ab) and
-    // exp(a)exp(b)).
+    // the differences between the Taylor expansion of exp(ab) and exp(a)exp(b)).
 
     // First, we need to decompose the bivector into the sum of two
     // commutative bivectors (the product of these two parts will be a
@@ -70,7 +69,7 @@ pub unsafe fn exp(a: __m128, b: __m128, p1_out: &mut __m128, p2_out: &mut __m128
     // Notice how the products above actually commute
     let norm_ideal = _mm_sub_ps(
         norm_ideal,
-        _mm_mul_ps(a, _mm_mul_ps(ab, _mm_mul_ps(a2_sqrt_rcp, rcp_nr1(a2)))),
+        _mm_mul_ps(a, _mm_mul_ps(ab, _mm_mul_ps(a2_sqrt_rcp, rcp_nr1(a2.into()).0))),
     );
 
     // The norm * our normalized bivector is the original bivector (a + b).
@@ -96,19 +95,21 @@ pub unsafe fn exp(a: __m128, b: __m128, p1_out: &mut __m128, p2_out: &mut __m128
     let sincosu = [uv[0].sin(), uv[0].cos()];
 
     let sinu = _mm_set1_ps(sincosu[0]);
-    *p1_out = _mm_add_ps(_mm_set_ss(sincosu[1]), _mm_mul_ps(sinu, norm_real));
+    let p1 = _mm_add_ps(_mm_set_ss(sincosu[1]), _mm_mul_ps(sinu, norm_real));
 
     // The second partition has contributions from both the real and ideal parts.
     let cosu = _mm_set_ps(sincosu[1], sincosu[1], sincosu[1], 0.0);
     let minus_vcosu = _mm_mul_ps(minus_v, cosu);
-    *p2_out = _mm_mul_ps(sinu, norm_ideal);
-    *p2_out = _mm_add_ps(*p2_out, _mm_mul_ps(minus_vcosu, norm_real));
+    let p2 = _mm_mul_ps(sinu, norm_ideal);
+    let p2 = _mm_add_ps(p2, _mm_mul_ps(minus_vcosu, norm_real));
     let minus_vsinu = uv[1] * sincosu[0];
-    *p2_out = _mm_add_ps(_mm_set_ss(minus_vsinu), *p2_out);
+    let p2 = _mm_add_ps(_mm_set_ss(minus_vsinu), p2);
+
+    (p1, p2)
 }
 
 #[inline(always)]
-pub unsafe fn log(p1: __m128, p2: __m128, p1_out: &mut __m128, p2_out: &mut __m128) {
+pub unsafe fn log(p1: __m128, p2: __m128) -> (__m128, __m128) {
     // The logarithm follows from the derivation of the exponential. Working
     // backwards, we ended up computing the exponential like so:
     //
@@ -167,11 +168,13 @@ pub unsafe fn log(p1: __m128, p2: __m128, p1_out: &mut __m128, p2_out: &mut __m1
     let norm_ideal = _mm_mul_ps(b, a2_sqrt_rcp);
     let norm_ideal = _mm_sub_ps(
         norm_ideal,
-        _mm_mul_ps(a, _mm_mul_ps(ab, _mm_mul_ps(a2_sqrt_rcp, rcp_nr1(a2)))),
+        _mm_mul_ps(a, _mm_mul_ps(ab, _mm_mul_ps(a2_sqrt_rcp, rcp_nr1(a2.into()).0))),
     );
 
     let uvec = _mm_set1_ps(u);
-    *p1_out = _mm_mul_ps(uvec, norm_real);
-    *p2_out = _mm_mul_ps(uvec, norm_ideal);
-    *p2_out = _mm_sub_ps(*p2_out, _mm_mul_ps(_mm_set1_ps(v), norm_real));
+    let p1 = _mm_mul_ps(uvec, norm_real);
+    let p2 = _mm_mul_ps(uvec, norm_ideal);
+    let p2 = _mm_sub_ps(p2, _mm_mul_ps(_mm_set1_ps(v), norm_real));
+
+    (p1, p2)
 }

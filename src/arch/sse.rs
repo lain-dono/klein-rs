@@ -1,5 +1,6 @@
 // Provide convenience macros and utilities for invoking x86 SSE
 
+use super::f32x4;
 use core::arch::x86_64::*;
 
 // Little-endian XMM register swizzle
@@ -15,6 +16,18 @@ macro_rules! swizzle {
             $reg,
             core::arch::x86_64::_MM_SHUFFLE($x, $y, $z, $w),
         )
+    };
+}
+
+macro_rules! f32x4_swizzle {
+    ($reg:expr, $x:expr, $y:expr, $z:expr, $w:expr) => {
+        f32x4(unsafe {
+            core::arch::x86_64::_mm_shuffle_ps(
+                ($reg).0,
+                ($reg).0,
+                core::arch::x86_64::_MM_SHUFFLE($x, $y, $z, $w),
+            )
+        })
     };
 }
 
@@ -39,16 +52,19 @@ pub unsafe fn hi_dp_ss(a: __m128, b: __m128) -> __m128 {
 
 // Reciprocal with an additional single Newton-Raphson refinement
 #[inline(always)]
-pub unsafe fn rcp_nr1(a: __m128) -> __m128 {
-    // f(x) = 1/x - a
-    // f'(x) = -1/x^2
-    // x_{n+1} = x_n - f(x)/f'(x)
-    //         = 2x_n - a x_n^2 = x_n (2 - a x_n)
+pub fn rcp_nr1(a: f32x4) -> f32x4 {
+    unsafe {
+        // f(x) = 1/x - a
+        // f'(x) = -1/x^2
+        // x_{n+1} = x_n - f(x)/f'(x)
+        //         = 2x_n - a x_n^2 = x_n (2 - a x_n)
 
-    // ~2.7x baseline with ~22 bits of accuracy
-    let xn = _mm_rcp_ps(a);
-    let axn = _mm_mul_ps(a, xn);
-    _mm_mul_ps(xn, _mm_sub_ps(_mm_set1_ps(2.0), axn))
+        // ~2.7x baseline with ~22 bits of accuracy
+        let a = a.into();
+        let xn = _mm_rcp_ps(a);
+        let axn = _mm_mul_ps(a, xn);
+        _mm_mul_ps(xn, _mm_sub_ps(_mm_set1_ps(2.0), axn)).into()
+    }
 }
 
 // Reciprocal sqrt with an additional single Newton-Raphson refinement.
@@ -108,8 +124,9 @@ pub unsafe fn hi_dp(a: __m128, b: __m128) -> __m128 {
 #[cfg(target_feature = "sse4.1")]
 #[inline(always)]
 pub unsafe fn hi_dp_bc(a: __m128, b: __m128) -> __m128 {
-    return _mm_dp_ps(a, b, 0b11101111);
+    _mm_dp_ps(a, b, 0b11101111);
 }
+
 #[cfg(not(target_feature = "sse4.1"))]
 #[inline(always)]
 pub unsafe fn hi_dp_bc(a: __m128, b: __m128) -> __m128 {
@@ -133,6 +150,7 @@ pub unsafe fn hi_dp_bc(a: __m128, b: __m128) -> __m128 {
 pub unsafe fn dp(a: __m128, b: __m128) -> __m128 {
     _mm_dp_ps(a, b, 0b11110001)
 }
+
 #[cfg(not(target_feature = "sse4.1"))]
 #[inline(always)]
 pub unsafe fn dp(a: __m128, b: __m128) -> __m128 {

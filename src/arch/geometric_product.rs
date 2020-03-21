@@ -172,7 +172,7 @@ pub unsafe fn gp33(a: __m128, b: __m128) -> __m128 {
     // (0, 1, 2, 3) -> (0, 0, 2, 2)
     let ss = _mm_moveldup_ps(tmp);
     let ss = _mm_movelh_ps(ss, ss);
-    let tmp = _mm_mul_ps(tmp, rcp_nr1(ss));
+    let tmp = _mm_mul_ps(tmp, rcp_nr1(ss.into()).0);
 
     if cfg!(target_feature = "sse4.1") {
         _mm_blend_ps(tmp, _mm_setzero_ps(), 1)
@@ -181,7 +181,7 @@ pub unsafe fn gp33(a: __m128, b: __m128) -> __m128 {
     }
 }
 
-pub unsafe fn gpDL(u: f32, v: f32, b: __m128, c: __m128, p1: &mut __m128, p2: &mut __m128) {
+pub unsafe fn gp_dl(u: f32, v: f32, b: __m128, c: __m128) -> (__m128, __m128) {
     // b1 u e23 +
     // b2 u e31 +
     // b3 u e12 +
@@ -190,65 +190,68 @@ pub unsafe fn gpDL(u: f32, v: f32, b: __m128, c: __m128, p1: &mut __m128, p2: &m
     // (-b3 v + c3 u) e03
     let u_vec = _mm_set1_ps(u);
     let v_vec = _mm_set1_ps(v);
-    *p1 = _mm_mul_ps(u_vec, b);
-    *p2 = _mm_mul_ps(c, u_vec);
-    *p2 = _mm_sub_ps(*p2, _mm_mul_ps(b, v_vec));
+    let p1 = _mm_mul_ps(u_vec, b);
+    let p2 = _mm_mul_ps(c, u_vec);
+    let p2 = _mm_sub_ps(p2, _mm_mul_ps(b, v_vec));
+    (p1, p2)
 }
 
-pub unsafe fn gpRT_true(a: __m128, b: __m128, p2: &mut __m128) {
+pub unsafe fn gp_rt_true(a: __m128, b: __m128) -> __m128 {
     // (a1 b1 + a2 b2 + a3 b3) e0123 +
     // (a0 b1 + a2 b3 - a3 b2) e01 +
     // (a0 b2 + a3 b1 - a1 b3) e02 +
     // (a0 b3 + a1 b2 - a2 b1) e03
 
-    *p2 = _mm_mul_ps(swizzle!(a, 0, 0, 0, 1), swizzle!(b, 3, 2, 1, 1));
-    *p2 = _mm_add_ps(
-        *p2,
+    let p2 = _mm_mul_ps(swizzle!(a, 0, 0, 0, 1), swizzle!(b, 3, 2, 1, 1));
+    let p2 = _mm_add_ps(
+        p2,
         _mm_mul_ps(swizzle!(a, 1, 3, 2, 2), swizzle!(b, 2, 1, 3, 2)),
     );
-    *p2 = _mm_sub_ps(
-        *p2,
+    let p2 = _mm_sub_ps(
+        p2,
         _mm_xor_ps(
             _mm_set_ss(-0.0),
             _mm_mul_ps(swizzle!(a, 2, 1, 3, 3), swizzle!(b, 1, 3, 2, 3)),
         ),
     );
+
+    p2
 }
 
-pub unsafe fn gpRT_false(a: __m128, b: __m128, p2: &mut __m128) {
+pub unsafe fn gp_rt_false(a: __m128, b: __m128) -> __m128 {
     // (a1 b1 + a2 b2 + a3 b3) e0123 +
     // (a0 b1 + a3 b2 - a2 b3) e01 +
     // (a0 b2 + a1 b3 - a3 b1) e02 +
     // (a0 b3 + a2 b1 - a1 b2) e03
 
-    *p2 = _mm_mul_ps(swizzle!(a, 0, 0, 0, 1), swizzle!(b, 3, 2, 1, 1));
-    *p2 = _mm_add_ps(
-        *p2,
+    let p2 = _mm_mul_ps(swizzle!(a, 0, 0, 0, 1), swizzle!(b, 3, 2, 1, 1));
+    let p2 = _mm_add_ps(
+        p2,
         _mm_mul_ps(swizzle!(a, 2, 1, 3, 2), swizzle!(b, 1, 3, 2, 2)),
     );
-    *p2 = _mm_sub_ps(
-        *p2,
+    _mm_sub_ps(
+        p2,
         _mm_xor_ps(
             _mm_set_ss(-0.0),
             _mm_mul_ps(swizzle!(a, 1, 3, 2, 3), swizzle!(b, 2, 1, 3, 3)),
         ),
-    );
+    )
 }
 
-pub unsafe fn gp12_true(a: __m128, b: __m128, p2: &mut __m128) {
-    gpRT_true(a, b, p2);
-    *p2 = _mm_sub_ps(
-        *p2,
+pub unsafe fn gp12_true(a: __m128, b: __m128) -> __m128 {
+    let p2 = gp_rt_true(a, b);
+    _mm_sub_ps(
+        p2,
         _mm_xor_ps(_mm_set_ss(-0.0), _mm_mul_ps(a, swizzle!(b, 0, 0, 0, 0))),
-    );
+    )
 }
 
-pub unsafe fn gp12_false(a: __m128, b: __m128, p2: &mut __m128) {
-    gpRT_false(a, b, p2);
-    *p2 = _mm_sub_ps(
-        *p2,
+pub unsafe fn gp12_false(a: __m128, b: __m128) -> __m128 {
+    let p2 = gp_rt_false(a, b);
+    _mm_sub_ps(
+        p2,
         _mm_xor_ps(_mm_set_ss(-0.0), _mm_mul_ps(a, swizzle!(b, 0, 0, 0, 0))),
-    );
+    )
 }
 
 // Optimized line * line operation
