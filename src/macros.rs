@@ -76,8 +76,8 @@ macro_rules! derive_conv {
     };
 }
 
-macro_rules! derive_ops {
-    (PartialEq::eq for $ty:ty => $ty_fn:ident) => {
+macro_rules! derive_eq {
+    ($ty:ty => $ty_fn:ident) => {
         impl std::cmp::PartialEq for $ty {
             #[inline]
             fn eq(&self, other: &Self) -> bool {
@@ -85,6 +85,9 @@ macro_rules! derive_ops {
             }
         }
     };
+}
+
+macro_rules! derive_ops {
 
     (vector add/sub/scale/flip_w for $ty:ident { $( $field:ident: $simd:ty ),+ }) => {
         derive_ops!(vector add/sub/scale for $ty { $($field:$simd),+ });
@@ -258,8 +261,8 @@ derive_ops!(vector add/sub/scale/flip_xyz for Plane { p0: __m128 });
 derive_ops!(vector add/sub/scale/flip_w for Rotor { p1: __m128 });
 derive_ops!(vector add/sub/scale for Translator { p2: __m128 });
 
-derive_ops!(PartialEq::eq for Motor => motor_eq);
-derive_ops!(PartialEq::eq for Rotor => rotor_eq);
+derive_eq!(Motor => motor_eq);
+derive_eq!(Rotor => rotor_eq);
 
 derive_attrs!(struct Direction {
     p3: {1: x, 2: y, 3: z}
