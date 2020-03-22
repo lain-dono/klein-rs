@@ -1,4 +1,4 @@
-use klein::{Line, Point, Plane};
+use klein::{Line, Plane, Point};
 
 #[test]
 fn simd_sandwich() {

@@ -1,5 +1,5 @@
-use klein::{Point, Plane, Rotor, Motor};
 use approx::abs_diff_eq;
+use klein::{Motor, Plane, Point, Rotor};
 
 #[test]
 fn multivector_sum_points() {
@@ -41,10 +41,7 @@ fn rotor_constrain() {
 
 #[test]
 fn motor_constrain() {
-    let m1 = Motor::new(
-        1.0, 2.0, 3.0, 4.0,
-        5.0, 6.0, 7.0, 8.0,
-    );
+    let m1 = Motor::new(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0);
     let m2 = m1.constrained();
     assert_eq!(m1, m2);
 

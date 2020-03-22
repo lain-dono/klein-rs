@@ -1,4 +1,4 @@
-use klein::{Point, Line, Plane};
+use klein::{Line, Plane, Point};
 
 // +z line
 #[test]
