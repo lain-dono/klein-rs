@@ -1,5 +1,4 @@
 //! exp_log Exponential and Logarithm
-//! @{
 //!
 //! The group of rotations, translations, and screws (combined rotatation and
 //! translation) is _nonlinear_. This means, given say, a rotor $\mathbf{r}$,
@@ -111,7 +110,7 @@ impl Rotor {
         let p1 = if cfg!(target_feature = "sse4.1") {
             p1.blend1(f32x4::zero())
         } else {
-            p1 & f32x4::new(-1.0, -1.0, -1.0, 0.0)
+            p1 & f32x4::cast_i32(-1, -1, -1, 0)
         };
         Branch { p1: p1.into() }
     }

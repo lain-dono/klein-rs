@@ -107,6 +107,6 @@ impl Translator {
     /// Conjugates a point $p$ with this translator and returns the result
     /// $tp\widetilde{t}$.
     pub fn conj_point(&self, p: Point) -> Point {
-        unsafe { Point::from(crate::arch::sw32(p.p3, self.p2)) }
+        Point::from(crate::arch::sw32(p.p3.into(), self.p2.into()).0)
     }
 }

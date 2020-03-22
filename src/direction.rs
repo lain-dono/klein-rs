@@ -1,4 +1,3 @@
-use core::arch::x86_64::*;
 use crate::arch::f32x4;
 
 /// Directions in **P**(&#x211d;&#x00B3;&#x2083;&#x2080;&#x2081;) are represented using
@@ -27,11 +26,8 @@ impl Direction {
     /// Normalize this direction by dividing all components by the magnitude
     /// (by default, `rsqrtps` is used with a single Newton-Raphson refinement iteration)
     pub fn normalize(&mut self) {
-        unsafe {
-            use crate::arch::{rsqrt_nr1, hi_dp_bc};
-            let tmp = rsqrt_nr1(hi_dp_bc(self.p3.0, self.p3.0));
-            self.p3 = _mm_mul_ps(self.p3.0, tmp).into();
-        }
+        let p3 = f32x4::from(self.p3);
+        self.p3 = (p3 * f32x4::hi_dp_bc(p3, p3).rsqrt_nr1()).into();
     }
 
     /// Return a normalized copy of this direction

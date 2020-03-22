@@ -117,12 +117,10 @@ impl Plane {
     /// the expression $p \ell p$.
     pub fn reflect_line(self, line: Line) -> Line {
         unsafe {
-            let mut out: Line = core::mem::uninitialized();
-            crate::arch::sw10(self.p0, line.p1, &mut out.p1, &mut out.p2);
-            let mut p2_tmp = core::mem::uninitialized();
-            crate::arch::sw20(self.p0, line.p2, &mut p2_tmp);
-            out.p2 = _mm_add_ps(out.p2, p2_tmp);
-            out
+            let (p1, p2) = crate::arch::sw10(self.p0, line.p1);
+            let p2 = _mm_add_ps(p2, crate::arch::sw20(self.p0, line.p2));
+
+            Line { p1: p1.into(), p2: p2.into() }
         }
     }
 

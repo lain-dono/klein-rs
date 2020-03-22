@@ -4,10 +4,9 @@
 pub mod sse;
 
 mod exp_log;
-mod matrix;
 mod sandwitch;
 
-pub use self::{exp_log::*, matrix::*, sandwitch::*, sse::*};
+pub use self::{exp_log::*, sandwitch::*, sse::*};
 
 use core::arch::x86_64::*;
 
@@ -205,6 +204,11 @@ impl f32x4 {
         Self(unsafe { sqrt_nr1(self.0) })
     }
 
+    #[inline(always)]
+    pub fn rsqrt_nr1(self) -> Self {
+        Self(unsafe { rsqrt_nr1(self.0) })
+    }
+
     pub fn movehdup(self) -> Self {
         Self::from(unsafe { _mm_movehdup_ps(self.0) })
     }
@@ -219,6 +223,15 @@ impl f32x4 {
 
     pub fn hi_dp_ss(a: Self, b: Self) -> Self {
         Self(unsafe { hi_dp_ss(a.0, b.0) })
+    }
+
+    pub fn hi_dp_bc(a: Self, b: Self) -> Self {
+        Self(unsafe { hi_dp_bc(a.0, b.0) })
+    }
+
+
+    pub fn cast_i32(a: i32, b: i32, c: i32, d: i32) -> Self {
+        Self(unsafe { _mm_castsi128_ps(_mm_set_epi32(a, b, c, d))})
     }
 
     pub fn blend1(self, b: Self) -> Self {

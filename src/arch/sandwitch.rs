@@ -46,7 +46,7 @@ pub fn sw00(a: f32x4, b: f32x4) -> f32x4 {
 }
 
 #[inline(always)]
-pub unsafe fn sw10(a: __m128, b: __m128, p1: &mut __m128, p2: &mut __m128) {
+pub unsafe fn sw10(a: __m128, b: __m128) -> (__m128, __m128) {
     //                       b0(a1^2 + a2^2 + a3^2) +
     // (2a3(a1 b1 + a2 b2) + b3(a3^2 - a1^2 - a2^2)) e12 +
     // (2a1(a2 b2 + a3 b3) + b1(a1^2 - a2^2 - a3^2)) e23 +
@@ -63,9 +63,9 @@ pub unsafe fn sw10(a: __m128, b: __m128, p1: &mut __m128, p2: &mut __m128) {
     let b_xzwy = swizzle!(b, 1, 3, 2, 0);
 
     let two_zero = _mm_set_ps(2.0, 2.0, 2.0, 0.0);
-    *p1 = _mm_mul_ps(a, b);
-    *p1 = _mm_add_ps(*p1, _mm_mul_ps(a_wzwy, b_xzwy));
-    *p1 = _mm_mul_ps(*p1, _mm_mul_ps(a_ywyz, two_zero));
+    let p1 = _mm_mul_ps(a, b);
+    let p1 = _mm_add_ps(p1, _mm_mul_ps(a_wzwy, b_xzwy));
+    let p1 = _mm_mul_ps(p1, _mm_mul_ps(a_ywyz, two_zero));
 
     let tmp = _mm_mul_ps(a_zyzw, a_zyzw);
     let tmp = _mm_add_ps(tmp, _mm_mul_ps(a_wzwy, a_wzwy));
@@ -73,16 +73,18 @@ pub unsafe fn sw10(a: __m128, b: __m128, p1: &mut __m128, p2: &mut __m128) {
     let tmp = _mm_sub_ps(_mm_mul_ps(a_ywyz, a_ywyz), tmp);
     let tmp = _mm_mul_ps(swizzle!(b, 2, 1, 3, 0), tmp);
 
-    *p1 = swizzle!(_mm_add_ps(*p1, tmp), 1, 3, 2, 0);
+    let p1 = swizzle!(_mm_add_ps(p1, tmp), 1, 3, 2, 0);
 
-    *p2 = _mm_mul_ps(a_zyzw, b_xzwy);
-    *p2 = _mm_sub_ps(*p2, _mm_mul_ps(a_wzwy, b));
-    *p2 = _mm_mul_ps(*p2, _mm_mul_ps(swizzle!(a, 0, 0, 0, 0), two_zero));
-    *p2 = swizzle!(*p2, 1, 3, 2, 0);
+    let p2 = _mm_mul_ps(a_zyzw, b_xzwy);
+    let p2 = _mm_sub_ps(p2, _mm_mul_ps(a_wzwy, b));
+    let p2 = _mm_mul_ps(p2, _mm_mul_ps(swizzle!(a, 0, 0, 0, 0), two_zero));
+    let p2 = swizzle!(p2, 1, 3, 2, 0);
+
+    (p1, p2)
 }
 
 #[inline(always)]
-pub unsafe fn sw20(a: __m128, b: __m128, p2: &mut __m128) {
+pub unsafe fn sw20(a: __m128, b: __m128) -> __m128 {
     //                       -b0(a1^2 + a2^2 + a3^2) e0123 +
     // (-2a3(a1 b1 + a2 b2) + b3(a1^2 + a2^2 - a3^2)) e03
     // (-2a1(a2 b2 + a3 b3) + b1(a2^2 + a3^2 - a1^2)) e01 +
@@ -91,9 +93,9 @@ pub unsafe fn sw20(a: __m128, b: __m128, p2: &mut __m128) {
     let a_zzwy = swizzle!(a, 1, 3, 2, 2);
     let a_wwyz = swizzle!(a, 2, 1, 3, 3);
 
-    *p2 = _mm_mul_ps(a, b);
-    *p2 = _mm_add_ps(*p2, _mm_mul_ps(a_zzwy, swizzle!(b, 1, 3, 2, 0)));
-    *p2 = _mm_mul_ps(*p2, _mm_mul_ps(a_wwyz, _mm_set_ps(-2.0, -2.0, -2.0, 0.0)));
+    let p2 = _mm_mul_ps(a, b);
+    let p2 = _mm_add_ps(p2, _mm_mul_ps(a_zzwy, swizzle!(b, 1, 3, 2, 0)));
+    let p2 = _mm_mul_ps(p2, _mm_mul_ps(a_wwyz, _mm_set_ps(-2.0, -2.0, -2.0, 0.0)));
 
     let a_yyzw = swizzle!(a, 3, 2, 1, 1);
     let tmp = _mm_mul_ps(a_yyzw, a_yyzw);
@@ -102,8 +104,10 @@ pub unsafe fn sw20(a: __m128, b: __m128, p2: &mut __m128) {
         _mm_add_ps(tmp, _mm_mul_ps(a_zzwy, a_zzwy)),
     );
     let tmp = _mm_sub_ps(tmp, _mm_mul_ps(a_wwyz, a_wwyz));
-    *p2 = _mm_add_ps(*p2, _mm_mul_ps(tmp, swizzle!(b, 2, 1, 3, 0)));
-    *p2 = swizzle!(*p2, 1, 3, 2, 0);
+    let p2 = _mm_add_ps(p2, _mm_mul_ps(tmp, swizzle!(b, 2, 1, 3, 0)));
+    let p2 = swizzle!(p2, 1, 3, 2, 0);
+
+    p2
 }
 
 #[inline(always)]
@@ -214,15 +218,13 @@ pub unsafe fn sw_l2(a: __m128, d: __m128, c: __m128) -> (__m128, __m128) {
 // p3: (e123, e032, e013, e021)
 // b * a * ~b
 #[inline(always)]
-pub unsafe fn sw32(a: __m128, b: __m128) -> __m128 {
+pub fn sw32(a: f32x4, b: f32x4) -> f32x4 {
     // a0 e123 +
     // (a1 - 2 a0 b1) e032 +
     // (a2 - 2 a0 b2) e013 +
     // (a3 - 2 a0 b3) e021
 
-    let tmp = _mm_mul_ps(swizzle!(a, 0, 0, 0, 0), b);
-    let tmp = _mm_mul_ps(_mm_set_ps(-2.0, -2.0, -2.0, 0.0), tmp);
-    _mm_add_ps(a, tmp)
+    a + f32x4::new(-2.0, -2.0, -2.0, 0.0) * shuffle!(a, [0, 0, 0, 0]) * b
 }
 
 // Apply a motor to a motor (works on lines as well)
