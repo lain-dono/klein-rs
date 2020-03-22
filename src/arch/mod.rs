@@ -1,17 +1,13 @@
-#![allow(dead_code)]
+#![allow(dead_code, unused_unsafe)]
 
 #[macro_use]
-mod sse;
+pub mod sse;
 
 mod exp_log;
-mod geometric_product;
-mod inner_product;
 mod matrix;
 mod sandwitch;
 
-pub use self::{
-    exp_log::*, geometric_product::*, inner_product::*, matrix::*, sandwitch::*, sse::*,
-};
+pub use self::{exp_log::*, matrix::*, sandwitch::*, sse::*};
 
 use core::arch::x86_64::*;
 
@@ -93,6 +89,22 @@ impl std::ops::Div<f32> for f32x4 {
     }
 }
 
+impl std::ops::BitAnd for f32x4 {
+    type Output = Self;
+    #[inline(always)]
+    fn bitand(self, other: Self) -> Self {
+        Self(unsafe { _mm_and_ps(self.0, other.0) })
+    }
+}
+
+impl std::ops::BitOr for f32x4 {
+    type Output = Self;
+    #[inline(always)]
+    fn bitor(self, other: Self) -> Self {
+        Self(unsafe { _mm_or_ps(self.0, other.0) })
+    }
+}
+
 impl std::ops::BitXor for f32x4 {
     type Output = Self;
     #[inline(always)]
@@ -108,18 +120,29 @@ impl f32x4 {
     }
 
     #[inline(always)]
+    pub fn all(s: f32) -> Self {
+        Self(unsafe { _mm_set1_ps(s) })
+    }
+
+    #[inline(always)]
+    pub fn zero() -> Self {
+        Self(unsafe { _mm_setzero_ps() })
+    }
+
+    // 1/self (rcp)
+    #[inline(always)]
+    pub fn recip(self) -> Self {
+        Self(unsafe { _mm_rcp_ps(self.0) })
+    }
+
+    #[inline(always)]
     pub fn flip_w() -> Self {
-        Self(unsafe { _mm_set1_ps(-0.0) })
+        Self::all(-0.0)
     }
 
     #[inline(always)]
     pub fn flip_xyz() -> Self {
-        Self(unsafe { _mm_set_ps(-0.0, -0.0, -0.0, 0.0) })
-    }
-
-    #[inline(always)]
-    pub fn all(s: f32) -> Self {
-        Self(unsafe { _mm_set1_ps(s) })
+        Self::new(-0.0, -0.0, -0.0, 0.0)
     }
 
     #[inline(always)]
@@ -156,8 +179,30 @@ impl f32x4 {
     }
 
     #[inline(always)]
+    pub fn set_scalar(s: f32) -> Self {
+        Self(unsafe { _mm_set_ss(s) })
+    }
+
+    #[inline(always)]
+    pub fn add_scalar(self, other: Self) -> Self {
+        Self(unsafe { _mm_add_ss(self.0, other.0) })
+    }
+
+    #[inline(always)]
+    pub fn mul_scalar(self, other: Self) -> Self {
+        Self(unsafe { _mm_mul_ss(self.0, other.0) })
+    }
+}
+
+impl f32x4 {
+    #[inline(always)]
     pub fn rcp_nr1(self) -> Self {
         rcp_nr1(self)
+    }
+
+    #[inline(always)]
+    pub fn sqrt_nr1(self) -> Self {
+        Self(unsafe { sqrt_nr1(self.0) })
     }
 
     pub fn movehdup(self) -> Self {
@@ -176,4 +221,11 @@ impl f32x4 {
         Self(unsafe { hi_dp_ss(a.0, b.0) })
     }
 
+    pub fn blend1(self, b: Self) -> Self {
+        if cfg!(target_feature = "sse4.1") {
+            Self(unsafe { _mm_blend_ps(self.0, b.0, 1) })
+        } else {
+            self + b
+        }
+    }
 }

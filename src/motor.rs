@@ -19,18 +19,18 @@
 //! ```c++
 //!     // Create a rotor representing a pi/2 rotation about the z-axis
 //!     // Normalization is done automatically
-//!     rotor r{M_PI * 0.5f, 0.f, 0.f, 1.f};
+//!     rotor r{M_PI * 0.5f, 0.0, 0.0, 1.0};
 //!
 //!     // Create a translator that represents a translation of 1 unit
 //!     // in the yz-direction. Normalization is done automatically.
-//!     translator t{1.f, 0.f, 1.f, 1.f};
+//!     translator t{1.0, 0.0, 1.0, 1.0};
 //!
 //!     // Create a motor that combines the action of the rotation and
 //!     // translation above.
 //!     motor m = r * t;
 //!
 //!     // Initialize a point at (1, 3, 2)
-//!     kln::point p1{1.f, 3.f, 2.f};
+//!     kln::point p1{1.0, 3.0, 2.0};
 //!
 //!     // Translate p1 and rotate it to create a new point p2
 //!     kln::point p2 = m(p1);
@@ -56,6 +56,7 @@
 //! between two motors is provided in a test case
 //! [here](https://github.com/jeremyong/Klein/blob/master/test/test_exp_log.cpp#L48).
 
+use crate::{Plane, Point};
 use core::arch::x86_64::*;
 
 #[derive(Clone, Copy)]
@@ -116,7 +117,7 @@ impl Motor {
     {}
 
     explicit KLN_VEC_CALL motor(translator t) noexcept
-        : p1_{_mm_set_ss(1.f)}
+        : p1_{_mm_set_ss(1.0)}
         , p2_{t.p2_}
     {}
 
@@ -143,82 +144,84 @@ impl Motor {
         p1_ = _mm_loadu_ps(in);
         p2_ = _mm_loadu_ps(in + 4);
     }
+    */
 
     /// Normalizes this motor $m$ such that $m\widetilde{m} = 1$.
-    void normalize() noexcept
-    {
-        // m = b + c where b is p1 and c is p2
-        //
-        // m * ~m = |b|^2 + 2(b0 c0 - b1 c1 - b2 c2 - b3 c3)e0123
-        //
-        // The square root is given as:
-        // |b| + (b0 c0 - b1 c1 - b2 c2 - b3 c3)/|b| e0123
-        //
-        // The inverse of this is given by:
-        // 1/|b| + (-b0 c0 + b1 c1 + b2 c2 + b3 c3)/|b|^3 e0123 = s + t e0123
-        //
-        // Multiplying our original motor by this inverse will give us a
-        // normalized motor.
-        __m128 b2 = detail::dp_bc(p1_, p1_);
-        __m128 s  = detail::rsqrt_nr1(b2);
-        __m128 bc = detail::dp_bc(_mm_xor_ps(p1_, _mm_set_ss(-0.f)), p2_);
-        __m128 t  = _mm_mul_ps(_mm_mul_ps(bc, detail::rcp_nr1(b2)), s);
+    pub fn normalize(&mut self) {
+        unsafe {
+            use crate::arch::{dp_bc, rcp_nr1, rsqrt_nr1};
 
-        // (s + t e0123) * motor =
-        //
-        // s b0 +
-        // s b1 e23 +
-        // s b2 e31 +
-        // s b3 e12 +
-        // (s c0 + t b0) e0123 +
-        // (s c1 - t b1) e01 +
-        // (s c2 - t b2) e02 +
-        // (s c3 - t b3) e03
+            // m = b + c where b is p1 and c is p2
+            //
+            // m * ~m = |b|^2 + 2(b0 c0 - b1 c1 - b2 c2 - b3 c3)e0123
+            //
+            // The square root is given as:
+            // |b| + (b0 c0 - b1 c1 - b2 c2 - b3 c3)/|b| e0123
+            //
+            // The inverse of this is given by:
+            // 1/|b| + (-b0 c0 + b1 c1 + b2 c2 + b3 c3)/|b|^3 e0123 = s + t e0123
+            //
+            // Multiplying our original motor by this inverse will give us a
+            // normalized motor.
+            let b2 = dp_bc(self.p1, self.p1);
+            let s = rsqrt_nr1(b2);
+            let bc = dp_bc(_mm_xor_ps(self.p1, _mm_set_ss(-0.0)), self.p2);
+            let t = _mm_mul_ps(_mm_mul_ps(bc, rcp_nr1(b2.into()).into()), s);
 
-        __m128 tmp = _mm_mul_ps(p2_, s);
-        p2_ = _mm_sub_ps(tmp, _mm_xor_ps(_mm_mul_ps(p1_, t), _mm_set_ss(-0.f)));
-        p1_ = _mm_mul_ps(p1_, s);
+            // (s + t e0123) * motor =
+            //
+            // s b0 +
+            // s b1 e23 +
+            // s b2 e31 +
+            // s b3 e12 +
+            // (s c0 + t b0) e0123 +
+            // (s c1 - t b1) e01 +
+            // (s c2 - t b2) e02 +
+            // (s c3 - t b3) e03
+
+            let tmp = _mm_mul_ps(self.p2, s);
+            self.p2 = _mm_sub_ps(tmp, _mm_xor_ps(_mm_mul_ps(self.p1, t), _mm_set_ss(-0.0)));
+            self.p1 = _mm_mul_ps(self.p1, s);
+        }
     }
 
     /// Return a normalized copy of this motor.
-    [[nodiscard]] motor normalized() const noexcept
-    {
-        motor out = *this;
-        out.normalize();
-        return out;
+    pub fn normalized(mut self) -> Self {
+        self.normalize();
+        self
     }
 
-    void invert() noexcept
-    {
-        // s, t computed as in the normalization
-        __m128 b2     = detail::dp_bc(p1_, p1_);
-        __m128 s      = detail::rsqrt_nr1(b2);
-        __m128 bc     = detail::dp_bc(_mm_xor_ps(p1_, _mm_set_ss(-0.f)), p2_);
-        __m128 b2_inv = detail::rcp_nr1(b2);
-        __m128 t      = _mm_mul_ps(_mm_mul_ps(bc, b2_inv), s);
-        __m128 neg    = _mm_set_ps(-0.f, -0.f, -0.f, 0.f);
+    pub fn invert(&mut self) {
+        unsafe {
+            // s, t computed as in the normalization
+            let b2 = crate::arch::dp_bc(self.p1, self.p1);
+            let s = crate::arch::rsqrt_nr1(b2);
+            let bc = crate::arch::dp_bc(_mm_xor_ps(self.p1, _mm_set_ss(-0.0)), self.p2);
+            let b2_inv = crate::arch::rcp_nr1(b2.into()).0;
+            let t = _mm_mul_ps(_mm_mul_ps(bc, b2_inv), s);
+            let neg = _mm_set_ps(-0.0, -0.0, -0.0, 0.0);
 
-        // p1 * (s + t e0123)^2 = (s * p1 - t p1_perp) * (s + t e0123)
-        // = s^2 p1 - s t p1_perp - s t p1_perp
-        // = s^2 p1 - 2 s t p1_perp
-        // (the scalar component above needs to be negated)
-        // p2 * (s + t e0123)^2 = s^2 p2 NOTE: s^2 = b2_inv
-        __m128 st = _mm_mul_ps(s, t);
-        st        = _mm_mul_ps(p1_, st);
-        p2_       = _mm_sub_ps(_mm_mul_ps(p2_, b2_inv),
-                         _mm_xor_ps(_mm_add_ps(st, st), _mm_set_ss(-0.f)));
-        p2_       = _mm_xor_ps(p2_, neg);
+            // p1 * (s + t e0123)^2 = (s * p1 - t p1_perp) * (s + t e0123)
+            // = s^2 p1 - s t p1_perp - s t p1_perp
+            // = s^2 p1 - 2 s t p1_perp
+            // (the scalar component above needs to be negated)
+            // p2 * (s + t e0123)^2 = s^2 p2 NOTE: s^2 = b2_inv
+            let st = _mm_mul_ps(s, t);
+            let st = _mm_mul_ps(self.p1, st);
+            self.p2 = _mm_sub_ps(
+                _mm_mul_ps(self.p2, b2_inv),
+                _mm_xor_ps(_mm_add_ps(st, st), _mm_set_ss(-0.0)),
+            );
+            self.p2 = _mm_xor_ps(self.p2, neg);
 
-        p1_ = _mm_xor_ps(_mm_mul_ps(p1_, b2_inv), neg);
+            self.p1 = _mm_xor_ps(_mm_mul_ps(self.p1, b2_inv), neg);
+        }
     }
 
-    [[nodiscard]] motor inverse() const noexcept
-    {
-        motor out = *this;
-        out.invert();
-        return out;
+    pub fn inverse(mut self) -> Self {
+        self.invert();
+        self
     }
-    */
 
     /// Constrains the motor to traverse the shortest arc
     pub fn constrain(&mut self) {
@@ -269,59 +272,67 @@ impl Motor {
     }
 
     /*
-        /// Convert this motor to a 3x4 column-major matrix representing this
-        /// motor's action as a linear transformation. The motor must be normalized
-        /// for this conversion to produce well-defined results, but is more
-        /// efficient than a 4x4 matrix conversion.
-        [[nodiscard]] mat3x4 as_mat3x4() const noexcept
-        {
-            mat3x4 out;
-            mat4x4_12<true, true>(p1_, &p2_, out.cols);
-            return out;
-        }
+    /// Convert this motor to a 3x4 column-major matrix representing this
+    /// motor's action as a linear transformation. The motor must be normalized
+    /// for this conversion to produce well-defined results, but is more
+    /// efficient than a 4x4 matrix conversion.
+    [[nodiscard]] mat3x4 as_mat3x4() const noexcept
+    {
+        mat3x4 out;
+        mat4x4_12<true, true>(p1_, &p2_, out.cols);
+        return out;
+    }
 
-        /// Convert this motor to a 4x4 column-major matrix representing this
-        /// motor's action as a linear transformation.
-        [[nodiscard]] mat4x4 as_mat4x4() const noexcept
-        {
-            mat4x4 out;
-            mat4x4_12<true, false>(p1_, &p2_, out.cols);
-            return out;
-        }
+    /// Convert this motor to a 4x4 column-major matrix representing this
+    /// motor's action as a linear transformation.
+    [[nodiscard]] mat4x4 as_mat4x4() const noexcept
+    {
+        mat4x4 out;
+        mat4x4_12<true, false>(p1_, &p2_, out.cols);
+        return out;
+    }
+    */
 
-        /// Conjugates a plane $p$ with this motor and returns the result
-        /// $mp\widetilde{m}$.
-        [[nodiscard]] plane KLN_VEC_CALL operator()(plane const& p) const noexcept
-        {
-            plane out;
-            detail::sw012<false, true>(&p.p0_, p1_, &p2_, &out.p0_);
-            return out;
+    /// Conjugates a plane $p$ with this motor and returns the result
+    /// $mp\widetilde{m}$.
+    pub fn conj_plane(self, p: Plane) -> Plane {
+        unsafe {
+            use core::iter::once;
+            let mut out: Plane = core::mem::uninitialized();
+            crate::arch::sw012(once(&p.p0), self.p1, Some(&self.p2), once(&mut out.p0));
+            out
         }
+    }
 
-        /// Conjugates an array of planes with this motor in the input array and
-        /// stores the result in the output array. Aliasing is only permitted when
-        /// `in == out` (in place motor application).
-        ///
-        /// !!! tip
-        ///
-        ///     When applying a motor to a list of tightly packed planes, this
-        ///     routine will be *significantly faster* than applying the motor to
-        ///     each plane individually.
-        void KLN_VEC_CALL operator()(plane* in, plane* out, size_t count) const
-            noexcept
-        {
-            detail::sw012<true, true>(&in->p0_, p1_, &p2_, &out->p0_, count);
-        }
+    /*
+    /// Conjugates an array of planes with this motor in the input array and
+    /// stores the result in the output array. Aliasing is only permitted when
+    /// `in == out` (in place motor application).
+    ///
+    /// !!! tip
+    ///
+    ///     When applying a motor to a list of tightly packed planes, this
+    ///     routine will be *significantly faster* than applying the motor to
+    ///     each plane individually.
+    void KLN_VEC_CALL operator()(plane* in, plane* out, size_t count) const
+        noexcept
+    {
+        detail::sw012<true, true>(&in->p0_, p1_, &p2_, &out->p0_, count);
+    }
+    */
 
-        /// Conjugates a line $\ell$ with this motor and returns the result
-        /// $m\ell \widetilde{m}$.
-        [[nodiscard]] line KLN_VEC_CALL operator()(line const& l) const noexcept
-        {
-            line out;
-            detail::swMM<false, true, true>(&l.p1_, p1_, &p2_, &out.p1_);
-            return out;
-        }
+    /*
+    /// Conjugates a line $\ell$ with this motor and returns the result
+    /// $m\ell \widetilde{m}$.
+    [[nodiscard]] line KLN_VEC_CALL operator()(line const& l) const noexcept
+    {
+        line out;
+        detail::swMM<false, true, true>(&l.p1_, p1_, &p2_, &out.p1_);
+        return out;
+    }
+    */
 
+    /*
         /// Conjugates an array of lines with this motor in the input array and
         /// stores the result in the output array. Aliasing is only permitted when
         /// `in == out` (in place motor application).

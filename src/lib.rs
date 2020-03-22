@@ -1,14 +1,15 @@
 #![feature(stdarch)]
-#![allow(deprecated, non_snake_case)]
+#![allow(deprecated, non_snake_case, unused_unsafe)]
 
 #[macro_use]
 pub mod arch;
 
-mod geometric_product;
-mod inner_product;
+mod exp_log;
 mod join;
 
 mod multivector_ep;
+mod multivector_gp;
+mod multivector_ip;
 
 mod direction; // done f32x4
 mod dual; // done scalar
@@ -34,6 +35,7 @@ pub use self::{
     translator::Translator,
 };
 
+/*
 pub fn direction(x: f32, y: f32, z: f32) -> Direction {
     Direction::new(x, y, z)
 }
@@ -73,3 +75,4 @@ pub fn rotor(a: f32, b: f32, c: f32, d: f32) -> Rotor {
 pub fn translator(delta: f32, x: f32, y: f32, z: f32) -> Translator {
     Translator::new(delta, x, y, z)
 }
+*/

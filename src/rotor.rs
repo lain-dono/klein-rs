@@ -41,7 +41,7 @@
 //! The same `*` operator can be used to compose the rotor's action with other
 //! translators and motors.
 
-use crate::{Direction, Point, Plane};
+use crate::{Direction, Point, Plane, arch::f32x4};
 use core::arch::x86_64::*;
 
 #[derive(Clone, Copy)]
@@ -70,6 +70,11 @@ impl Rotor {
 
             Self { p1 }
         }
+    }
+
+    #[doc(hidden)]
+    pub fn raw(a: f32, b: f32, c: f32, d: f32) -> Self {
+        Self::from(f32x4::new(a, b, c, d).0)
     }
 
     /// Fast load operation for packed data that is already normalized. The

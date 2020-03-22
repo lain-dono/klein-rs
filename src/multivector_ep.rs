@@ -56,11 +56,11 @@ impl_meet!(|a: Plane, b: Plane| -> Line {
     // (a0 b2 - a2 b0) e02 +
     // (a0 b3 - a3 b0) e03
 
-    let p1 = a * f32x4_swizzle!(b, 1, 3, 2, 0);
-    let p1 = f32x4_swizzle!(p1 - f32x4_swizzle!(a, 1, 3, 2, 0) * b, 1, 3, 2, 0);
+    let p1 = a * shuffle!(b, [1, 3, 2, 0]);
+    let p1 = shuffle!(p1 - shuffle!(a, [1, 3, 2, 0]) * b, [1, 3, 2, 0]);
 
-    let p2 = f32x4_swizzle!(a, 0, 0, 0, 0) * b;
-    let p2 = p2 - a * f32x4_swizzle!(b, 0, 0, 0, 0);
+    let p2 = shuffle!(a, [0, 0, 0, 0]) * b;
+    let p2 = p2 - a * shuffle!(b, [0, 0, 0, 0]);
 
     // For both outputs above, we don't zero the lowest component because
     // we've arranged a cancelation
@@ -139,7 +139,7 @@ pub fn ext_pb(a: f32x4, b: f32x4) -> f32x4 {
     // (-a0 b2) e013 +
     // (-a0 b3) e021
 
-    f32x4_swizzle!(a, 0, 0, 0, 1) * b * f32x4::new(-1.0, -1.0, -1.0, 0.0) + f32x4::hi_dp(a, b)
+    shuffle!(a, [0, 0, 0, 1]) * b * f32x4::new(-1.0, -1.0, -1.0, 0.0) + f32x4::hi_dp(a, b)
 }
 
 // p0 ^ p2 = p2 ^ p0
@@ -149,7 +149,7 @@ pub fn ext02(a: f32x4, b: f32x4) -> f32x4 {
     // (a2 b3 - a3 b2) e032 +
     // (a3 b1 - a1 b3) e013 +
 
-    let p3 = a * f32x4_swizzle!(b, 1, 3, 2, 0);
-    let p3 = p3 - f32x4_swizzle!(a, 1, 3, 2, 0) * b;
-    f32x4_swizzle!(p3, 1, 3, 2, 0)
+    let p3 = a * shuffle!(b, [1, 3, 2, 0]);
+    let p3 = p3 - shuffle!(a, [1, 3, 2, 0]) * b;
+    shuffle!(p3, [1, 3, 2, 0])
 }

@@ -19,6 +19,11 @@ impl Dual {
     pub fn e0123(self) -> f32 {
         self.q
     }
+
+    #[inline]
+    pub fn inverse(self) -> Self {
+        -self // maybe
+    }
 }
 
 impl std::ops::Add for Dual {
@@ -57,6 +62,16 @@ impl std::ops::Div<f32> for Dual {
         Self {
             p: self.p / s,
             q: self.q / s,
+        }
+    }
+}
+
+impl std::ops::Neg for Dual {
+    type Output = Self;
+    fn neg(self) -> Self::Output {
+        Self {
+            p: -self.p,
+            q: -self.q,
         }
     }
 }

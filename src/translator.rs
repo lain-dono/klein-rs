@@ -36,7 +36,7 @@
 //! The same `*` operator can be used to compose the translator's action with
 //! other rotors and motors.
 
-use crate::{Line, Plane, Point};
+use crate::{Line, Plane, Point, arch::f32x4};
 use core::arch::x86_64::*;
 
 #[derive(Clone, Copy)]
@@ -55,6 +55,11 @@ impl Translator {
             let p2 = _mm_mul_ps(p2, _mm_set_ps(inv_norm, inv_norm, inv_norm, 0.0));
             Self { p2 }
         }
+    }
+
+    #[doc(hidden)]
+    pub fn raw(a: f32, b: f32, c: f32, d: f32) -> Self {
+        Self::from(f32x4::new(a, b, c, d).0)
     }
 
     /// Fast load operation for packed data that is already normalized. The
@@ -82,7 +87,7 @@ impl Translator {
 
     /// Conjugates a plane $p$ with this translator and returns the result
     /// $tp\widetilde{t}$.
-    pub fn conj_plane(&self, p: &Plane) -> Plane {
+    pub fn conj_plane(&self, p: Plane) -> Plane {
         unsafe {
             let blend = if cfg!(target_feature = "sse4.1") {
                 _mm_blend_ps(self.p2, _mm_set_ss(1.0), 1)
@@ -95,13 +100,13 @@ impl Translator {
 
     /// Conjugates a line $\ell$ with this translator and returns the result
     /// $t\ell\widetilde{t}$.
-    pub fn conj_line(&self, l: &Line) -> Line {
+    pub fn conj_line(&self, l: Line) -> Line {
         unsafe { Line::from(crate::arch::sw_l2(l.p1, l.p2, self.p2)) }
     }
 
     /// Conjugates a point $p$ with this translator and returns the result
     /// $tp\widetilde{t}$.
-    pub fn conj_point(&self, p: &Point) -> Point {
+    pub fn conj_point(&self, p: Point) -> Point {
         unsafe { Point::from(crate::arch::sw32(p.p3, self.p2)) }
     }
 }

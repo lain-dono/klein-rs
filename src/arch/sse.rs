@@ -5,29 +5,32 @@ use core::arch::x86_64::*;
 
 // Little-endian XMM register swizzle
 //
-// KLN_SWIZZLE(reg, 3, 2, 1, 0) is the identity.
+// swizzle(reg, 3, 2, 1, 0) is the identity.
 //
 // This is undef-ed at the bottom of klein.hpp so as not to
 // pollute the macro namespace
 macro_rules! swizzle {
     ($reg:expr, $x:expr, $y:expr, $z:expr, $w:expr) => {
-        core::arch::x86_64::_mm_shuffle_ps(
-            $reg,
-            $reg,
-            core::arch::x86_64::_MM_SHUFFLE($x, $y, $z, $w),
-        )
+        swizzle!($reg, $reg, $x, $y, $z, $w)
     };
-}
 
-macro_rules! f32x4_swizzle {
-    ($reg:expr, $x:expr, $y:expr, $z:expr, $w:expr) => {
-        f32x4(unsafe {
+    ($a:expr, $b:expr, $x:expr, $y:expr, $z:expr, $w:expr) => {{
+        unsafe {
             core::arch::x86_64::_mm_shuffle_ps(
-                ($reg).0,
-                ($reg).0,
+                $a.into(),
+                $b.into(),
                 core::arch::x86_64::_MM_SHUFFLE($x, $y, $z, $w),
             )
-        })
+        }
+    }};
+}
+
+macro_rules! shuffle {
+    ($reg:expr, [$x:expr, $y:expr, $z:expr, $w:expr]) => {
+        f32x4(swizzle!($reg, $reg, $x, $y, $z, $w));
+    };
+    ($a:expr, $b:expr, [$x:expr, $y:expr, $z:expr, $w:expr]) => {
+        f32x4(swizzle!($a, $b, $x, $y, $z, $w))
     };
 }
 
@@ -92,97 +95,85 @@ pub unsafe fn sqrt_nr1(a: __m128) -> __m128 {
     _mm_mul_ps(a, rsqrt_nr1(a))
 }
 
-#[cfg(target_feature = "sse4.1")]
 #[inline(always)]
 pub unsafe fn hi_dp(a: __m128, b: __m128) -> __m128 {
-    _mm_dp_ps(a, b, 0b11100001)
+    if cfg!(target_feature = "sse4.1") {
+        _mm_dp_ps(a, b, 0b11100001)
+    } else {
+        // Equivalent to _mm_dp_ps(a, b, 0b11100001);
+
+        // 0 1 2 3 -> 1 + 2 + 3, 0, 0, 0
+        let out = _mm_mul_ps(a, b);
+
+        // 0 1 2 3 -> 1 1 3 3
+        let hi = _mm_movehdup_ps(out);
+
+        // 0 1 2 3 + 1 1 3 3 -> (0 + 1, 1 + 1, 2 + 3, 3 + 3)
+        let sum = _mm_add_ps(hi, out);
+
+        // unpacklo: 0 0 1 1
+        let out = _mm_add_ps(sum, _mm_unpacklo_ps(out, out));
+
+        // (1 + 2 + 3, _, _, _)
+        let out = _mm_movehl_ps(out, out);
+
+        _mm_and_ps(out, _mm_castsi128_ps(_mm_set_epi32(0, 0, 0, -1)))
+    }
 }
 
-// Equivalent to _mm_dp_ps(a, b, 0b11100001);
-#[cfg(not(target_feature = "sse4.1"))]
-#[inline(always)]
-pub unsafe fn hi_dp(a: __m128, b: __m128) -> __m128 {
-    // 0 1 2 3 -> 1 + 2 + 3, 0, 0, 0
-
-    let out = _mm_mul_ps(a, b);
-
-    // 0 1 2 3 -> 1 1 3 3
-    let hi = _mm_movehdup_ps(out);
-
-    // 0 1 2 3 + 1 1 3 3 -> (0 + 1, 1 + 1, 2 + 3, 3 + 3)
-    let sum = _mm_add_ps(hi, out);
-
-    // unpacklo: 0 0 1 1
-    let out = _mm_add_ps(sum, _mm_unpacklo_ps(out, out));
-
-    // (1 + 2 + 3, _, _, _)
-    let out = _mm_movehl_ps(out, out);
-
-    _mm_and_ps(out, _mm_castsi128_ps(_mm_set_epi32(0, 0, 0, -1)))
-}
-
-#[cfg(target_feature = "sse4.1")]
 #[inline(always)]
 pub unsafe fn hi_dp_bc(a: __m128, b: __m128) -> __m128 {
-    _mm_dp_ps(a, b, 0b11101111);
+    if cfg!(target_feature = "sse4.1") {
+        _mm_dp_ps(a, b, 0b11101111)
+    } else {
+        // Multiply across and mask low component
+        let out = _mm_mul_ps(a, b);
+
+        // 0 1 2 3 -> 1 1 3 3
+        let hi = _mm_movehdup_ps(out);
+
+        // 0 1 2 3 + 1 1 3 3 -> (0 + 1, 1 + 1, 2 + 3, 3 + 3)
+        let sum = _mm_add_ps(hi, out);
+
+        // unpacklo: 0 0 1 1
+        let out = _mm_add_ps(sum, _mm_unpacklo_ps(out, out));
+
+        swizzle!(out, 2, 2, 2, 2)
+    }
 }
 
-#[cfg(not(target_feature = "sse4.1"))]
-#[inline(always)]
-pub unsafe fn hi_dp_bc(a: __m128, b: __m128) -> __m128 {
-    // Multiply across and mask low component
-    let out = _mm_mul_ps(a, b);
-
-    // 0 1 2 3 -> 1 1 3 3
-    let hi = _mm_movehdup_ps(out);
-
-    // 0 1 2 3 + 1 1 3 3 -> (0 + 1, 1 + 1, 2 + 3, 3 + 3)
-    let sum = _mm_add_ps(hi, out);
-
-    // unpacklo: 0 0 1 1
-    let out = _mm_add_ps(sum, _mm_unpacklo_ps(out, out));
-
-    swizzle!(out, 2, 2, 2, 2)
-}
-
-#[cfg(target_feature = "sse4.1")]
 #[inline(always)]
 pub unsafe fn dp(a: __m128, b: __m128) -> __m128 {
-    _mm_dp_ps(a, b, 0b11110001)
+    if cfg!(target_feature = "sse4.1") {
+        _mm_dp_ps(a, b, 0b11110001)
+    } else {
+        // Multiply across and shift right (shifting in zeros)
+        let out = _mm_mul_ps(a, b);
+        let hi = _mm_movehdup_ps(out);
+
+        // (a1 b1, a2 b2, a3 b3, 0) + (a2 b2, a2 b2, 0, 0)
+        // = (a1 b1 + a2 b2, _, a3 b3, 0)
+        let out = _mm_add_ps(hi, out);
+        let out = _mm_add_ss(out, _mm_movehl_ps(hi, out));
+
+        _mm_and_ps(out, _mm_castsi128_ps(_mm_set_epi32(0, 0, 0, -1)))
+    }
 }
 
-#[cfg(not(target_feature = "sse4.1"))]
-#[inline(always)]
-pub unsafe fn dp(a: __m128, b: __m128) -> __m128 {
-    // Multiply across and shift right (shifting in zeros)
-    let out = _mm_mul_ps(a, b);
-    let hi = _mm_movehdup_ps(out);
-
-    // (a1 b1, a2 b2, a3 b3, 0) + (a2 b2, a2 b2, 0, 0)
-    // = (a1 b1 + a2 b2, _, a3 b3, 0)
-    let out = _mm_add_ps(hi, out);
-    let out = _mm_add_ss(out, _mm_movehl_ps(hi, out));
-
-    _mm_and_ps(out, _mm_castsi128_ps(_mm_set_epi32(0, 0, 0, -1)))
-}
-
-#[cfg(target_feature = "sse4.1")]
 #[inline(always)]
 pub unsafe fn dp_bc(a: __m128, b: __m128) -> __m128 {
-    _mm_dp_ps(a, b, 0xff)
-}
+    if cfg!(target_feature = "sse4.1") {
+        _mm_dp_ps(a, b, 0xff)
+    } else {
+        // Multiply across and shift right (shifting in zeros)
+        let out = _mm_mul_ps(a, b);
+        let hi = _mm_movehdup_ps(out);
 
-#[cfg(not(target_feature = "sse4.1"))]
-#[inline(always)]
-pub unsafe fn dp_bc(a: __m128, b: __m128) -> __m128 {
-    // Multiply across and shift right (shifting in zeros)
-    let out = _mm_mul_ps(a, b);
-    let hi = _mm_movehdup_ps(out);
+        // (a1 b1, a2 b2, a3 b3, 0) + (a2 b2, a2 b2, 0, 0)
+        // = (a1 b1 + a2 b2, _, a3 b3, 0)
+        let out = _mm_add_ps(hi, out);
+        let out = _mm_add_ss(out, _mm_movehl_ps(hi, out));
 
-    // (a1 b1, a2 b2, a3 b3, 0) + (a2 b2, a2 b2, 0, 0)
-    // = (a1 b1 + a2 b2, _, a3 b3, 0)
-    let out = _mm_add_ps(hi, out);
-    let out = _mm_add_ss(out, _mm_movehl_ps(hi, out));
-
-    swizzle!(out, 0, 0, 0, 0)
+        swizzle!(out, 0, 0, 0, 0)
+    }
 }

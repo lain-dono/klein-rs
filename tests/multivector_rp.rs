@@ -1,10 +1,10 @@
-use klein::{point, Line, Plane};
+use klein::{Point, Line, Plane};
 
 // +z line
 #[test]
 fn z_line() {
-    let p1 = point(0.0, 0.0, 0.0);
-    let p2 = point(0.0, 0.0, 1.0);
+    let p1 = Point::new(0.0, 0.0, 0.0);
+    let p2 = Point::new(0.0, 0.0, 1.0);
     let p12: Line = p1 & p2;
     assert_eq!(p12.e12(), 1.0);
 }
@@ -12,8 +12,8 @@ fn z_line() {
 // +y line
 #[test]
 fn y_line() {
-    let p1 = point(0.0, -1.0, 0.0);
-    let p2 = point(0.0, 0.0, 0.0);
+    let p1 = Point::new(0.0, -1.0, 0.0);
+    let p2 = Point::new(0.0, 0.0, 0.0);
     let p12: Line = p1 & p2;
     assert_eq!(p12.e31(), 1.0);
 }
@@ -21,8 +21,8 @@ fn y_line() {
 // +x line
 #[test]
 fn x_line() {
-    let p1 = point(-2.0, 0.0, 0.0);
-    let p2 = point(-1.0, 0.0, 0.0);
+    let p1 = Point::new(-2.0, 0.0, 0.0);
+    let p2 = Point::new(-1.0, 0.0, 0.0);
     let p12: Line = p1 & p2;
     assert_eq!(p12.e23(), 1.0);
 }
@@ -30,9 +30,9 @@ fn x_line() {
 // plane-construction
 #[test]
 fn plane_construction() {
-    let p1 = point(1.0, 3.0, 2.0);
-    let p2 = point(-1.0, 5.0, 2.0);
-    let p3 = point(2.0, -1.0, -4.0);
+    let p1 = Point::new(1.0, 3.0, 2.0);
+    let p2 = Point::new(-1.0, 5.0, 2.0);
+    let p3 = Point::new(2.0, -1.0, -4.0);
 
     let p123: Plane = p1 & p2 & p3;
 

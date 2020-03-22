@@ -94,7 +94,7 @@ impl Plane {
         unsafe { _mm_movemask_ps(_mm_cmpeq_ps(self.p0, other.p0)) == 0b1111 }
     }
 
-    pub fn plane_approx_eq(self, other: Self, epsilon: f32) -> bool {
+    pub fn approx_eq(self, other: Self, epsilon: f32) -> bool {
         unsafe {
             let eps = _mm_set1_ps(epsilon);
             let cmp = _mm_cmplt_ps(
@@ -108,14 +108,14 @@ impl Plane {
     /// Reflect another plane $p_2$ through this plane $p_1$. The operation
     /// performed via this call operator is an optimized routine equivalent to
     /// the expression $p_1 p_2 p_1$.
-    pub fn plane_reflect_plane(self, p: &Self) -> Self {
+    pub fn reflect_plane(self, p: Self) -> Self {
         Plane::from(crate::arch::sw00(self.p0.into(), p.p0.into()).0)
     }
 
     /// Reflect line $\ell$ through this plane $p$. The operation
     /// performed via this call operator is an optimized routine equivalent to
     /// the expression $p \ell p$.
-    pub fn plane_reflect_line(self, line: &Line) -> Line {
+    pub fn reflect_line(self, line: Line) -> Line {
         unsafe {
             let mut out: Line = core::mem::uninitialized();
             crate::arch::sw10(self.p0, line.p1, &mut out.p1, &mut out.p2);
@@ -129,7 +129,7 @@ impl Plane {
     /// Reflect the point $P$ through this plane $p$. The operation
     /// performed via this call operator is an optimized routine equivalent to
     /// the expression $p P p$.
-    pub fn plane_reflect_point(self, p: &Point) -> Point {
+    pub fn reflect_point(self, p: Point) -> Point {
         Point::from(unsafe { crate::arch::sw30(self.p0, p.p3) })
     }
 }
