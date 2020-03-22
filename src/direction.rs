@@ -26,8 +26,7 @@ impl Direction {
     /// Normalize this direction by dividing all components by the magnitude
     /// (by default, `rsqrtps` is used with a single Newton-Raphson refinement iteration)
     pub fn normalize(&mut self) {
-        let p3 = f32x4::from(self.p3);
-        self.p3 = (p3 * f32x4::hi_dp_bc(p3, p3).rsqrt_nr1()).into();
+        self.p3 = self.p3 * f32x4::hi_dp_bc(self.p3, self.p3).rsqrt_nr1();
     }
 
     /// Return a normalized copy of this direction
