@@ -94,7 +94,7 @@ impl Translator {
             } else {
                 _mm_add_ps(self.p2, _mm_set_ss(1.0))
             };
-            Plane::from(crate::arch::sw02(p.p0, blend))
+            Plane::from(crate::arch::sw02(p.p0.into(), blend.into()))
         }
     }
 

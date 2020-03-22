@@ -46,7 +46,7 @@ pub fn sw00(a: f32x4, b: f32x4) -> f32x4 {
 }
 
 #[inline(always)]
-pub unsafe fn sw10(a: __m128, b: __m128) -> (__m128, __m128) {
+pub fn sw10(a: f32x4, b: f32x4) -> (f32x4, f32x4) {
     //                       b0(a1^2 + a2^2 + a3^2) +
     // (2a3(a1 b1 + a2 b2) + b3(a3^2 - a1^2 - a2^2)) e12 +
     // (2a1(a2 b2 + a3 b3) + b1(a1^2 - a2^2 - a3^2)) e23 +
@@ -56,84 +56,64 @@ pub unsafe fn sw10(a: __m128, b: __m128) -> (__m128, __m128) {
     // 2a0(a2 b3 - a3 b2) e01 +
     // 2a0(a3 b1 - a1 b3) e02 +
 
-    let a_zyzw = swizzle!(a, 3, 2, 1, 2);
-    let a_ywyz = swizzle!(a, 2, 1, 3, 1);
-    let a_wzwy = swizzle!(a, 1, 3, 2, 3);
+    let a_zyzw = shuffle!(a, [3, 2, 1, 2]);
+    let a_ywyz = shuffle!(a, [2, 1, 3, 1]);
+    let a_wzwy = shuffle!(a, [1, 3, 2, 3]);
 
-    let b_xzwy = swizzle!(b, 1, 3, 2, 0);
+    let b_xzwy = shuffle!(b, [1, 3, 2, 0]);
 
-    let two_zero = _mm_set_ps(2.0, 2.0, 2.0, 0.0);
-    let p1 = _mm_mul_ps(a, b);
-    let p1 = _mm_add_ps(p1, _mm_mul_ps(a_wzwy, b_xzwy));
-    let p1 = _mm_mul_ps(p1, _mm_mul_ps(a_ywyz, two_zero));
+    let two_zero = f32x4::new(2.0, 2.0, 2.0, 0.0);
 
-    let tmp = _mm_mul_ps(a_zyzw, a_zyzw);
-    let tmp = _mm_add_ps(tmp, _mm_mul_ps(a_wzwy, a_wzwy));
-    let tmp = _mm_xor_ps(tmp, _mm_set_ss(-0.0));
-    let tmp = _mm_sub_ps(_mm_mul_ps(a_ywyz, a_ywyz), tmp);
-    let tmp = _mm_mul_ps(swizzle!(b, 2, 1, 3, 0), tmp);
+    let p1 = (a_zyzw * a_zyzw + a_wzwy * a_wzwy) ^ f32x4::set_scalar(-0.0);
+    let p1 = (a_ywyz * a_ywyz - p1) * shuffle!(b, [2, 1, 3, 0]);
+    let p1 = (a * b + a_wzwy * b_xzwy) * a_ywyz * two_zero + p1;
+    let p1 = shuffle!(p1, [1, 3, 2, 0]);
 
-    let p1 = swizzle!(_mm_add_ps(p1, tmp), 1, 3, 2, 0);
-
-    let p2 = _mm_mul_ps(a_zyzw, b_xzwy);
-    let p2 = _mm_sub_ps(p2, _mm_mul_ps(a_wzwy, b));
-    let p2 = _mm_mul_ps(p2, _mm_mul_ps(swizzle!(a, 0, 0, 0, 0), two_zero));
-    let p2 = swizzle!(p2, 1, 3, 2, 0);
+    let p2 = (a_zyzw * b_xzwy - a_wzwy * b) * shuffle!(a, [0, 0, 0, 0]) * two_zero;
+    let p2 = shuffle!(p2, [1, 3, 2, 0]);
 
     (p1, p2)
 }
 
 #[inline(always)]
-pub unsafe fn sw20(a: __m128, b: __m128) -> __m128 {
+pub fn sw20(a: f32x4, b: f32x4) -> f32x4 {
     //                       -b0(a1^2 + a2^2 + a3^2) e0123 +
     // (-2a3(a1 b1 + a2 b2) + b3(a1^2 + a2^2 - a3^2)) e03
     // (-2a1(a2 b2 + a3 b3) + b1(a2^2 + a3^2 - a1^2)) e01 +
     // (-2a2(a3 b3 + a1 b1) + b2(a3^2 + a1^2 - a2^2)) e02 +
 
-    let a_zzwy = swizzle!(a, 1, 3, 2, 2);
-    let a_wwyz = swizzle!(a, 2, 1, 3, 3);
+    let a_zzwy = shuffle!(a, [1, 3, 2, 2]);
+    let a_wwyz = shuffle!(a, [2, 1, 3, 3]);
 
-    let p2 = _mm_mul_ps(a, b);
-    let p2 = _mm_add_ps(p2, _mm_mul_ps(a_zzwy, swizzle!(b, 1, 3, 2, 0)));
-    let p2 = _mm_mul_ps(p2, _mm_mul_ps(a_wwyz, _mm_set_ps(-2.0, -2.0, -2.0, 0.0)));
+    let p2 = a * b;
+    let p2 = p2 + a_zzwy * shuffle!(b, [1, 3, 2, 0]);
+    let p2 = p2 * a_wwyz * f32x4::new(-2.0, -2.0, -2.0, 0.0);
 
-    let a_yyzw = swizzle!(a, 3, 2, 1, 1);
-    let tmp = _mm_mul_ps(a_yyzw, a_yyzw);
-    let tmp = _mm_xor_ps(
-        _mm_set_ss(-0.0),
-        _mm_add_ps(tmp, _mm_mul_ps(a_zzwy, a_zzwy)),
-    );
-    let tmp = _mm_sub_ps(tmp, _mm_mul_ps(a_wwyz, a_wwyz));
-    let p2 = _mm_add_ps(p2, _mm_mul_ps(tmp, swizzle!(b, 2, 1, 3, 0)));
-    let p2 = swizzle!(p2, 1, 3, 2, 0);
-
-    p2
+    let a_yyzw = shuffle!(a, [3, 2, 1, 1]);
+    let tmp = a_yyzw * a_yyzw;
+    let tmp = f32x4::set_scalar(-0.0) ^ (tmp + a_zzwy * a_zzwy);
+    let tmp = tmp - a_wwyz * a_wwyz;
+    let p2 = p2 + tmp * shuffle!(b, [2, 1, 3, 0]);
+    shuffle!(p2, [1, 3, 2, 0])
 }
 
 #[inline(always)]
-pub unsafe fn sw30(a: __m128, b: __m128) -> __m128 {
+pub fn sw30(a: f32x4, b: f32x4) -> f32x4 {
     //                                b0(a1^2 + a2^2 + a3^2)  e123 +
     // (-2a1(a0 b0 + a3 b3 + a2 b2) + b1(a2^2 + a3^2 - a1^2)) e032 +
     // (-2a2(a0 b0 + a1 b1 + a3 b3) + b2(a3^2 + a1^2 - a2^2)) e013 +
     // (-2a3(a0 b0 + a2 b2 + a1 b1) + b3(a1^2 + a2^2 - a3^2)) e021
 
-    let a_zwyz = swizzle!(a, 2, 1, 3, 2);
-    let a_yzwy = swizzle!(a, 1, 3, 2, 1);
+    let a_zwyz = shuffle!(a, [2, 1, 3, 2]);
+    let a_yzwy = shuffle!(a, [1, 3, 2, 1]);
+    let a_wyzw = shuffle!(a, [3, 2, 1, 3]);
 
-    let p3 = _mm_mul_ps(swizzle!(a, 0, 0, 0, 0), swizzle!(b, 0, 0, 0, 0));
-    let p3 = _mm_add_ps(p3, _mm_mul_ps(a_zwyz, swizzle!(b, 2, 1, 3, 0)));
-    let p3 = _mm_add_ps(p3, _mm_mul_ps(a_yzwy, swizzle!(b, 1, 3, 2, 0)));
-    let p3 = _mm_mul_ps(p3, _mm_mul_ps(a, _mm_set_ps(-2.0, -2.0, -2.0, 0.0)));
+    let p3 = shuffle!(a, [0, 0, 0, 0]) * shuffle!(b, [0, 0, 0, 0]);
 
-    let tmp = _mm_mul_ps(a_yzwy, a_yzwy);
-    let tmp = _mm_add_ps(tmp, _mm_mul_ps(a_zwyz, a_zwyz));
-    let a_wyzw = swizzle!(a, 3, 2, 1, 3);
-    let tmp = _mm_sub_ps(
-        tmp,
-        _mm_xor_ps(_mm_mul_ps(a_wyzw, a_wyzw), _mm_set_ss(-0.0)),
-    );
+    let p3 = p3 + a_zwyz * shuffle!(b, [2, 1, 3, 0]) + a_yzwy * shuffle!(b, [1, 3, 2, 0]);
+    let p3 = p3 * a * f32x4::new(-2.0, -2.0, -2.0, 0.0);
 
-    _mm_add_ps(p3, _mm_mul_ps(b, tmp))
+    p3 + b * (a_yzwy * a_yzwy + a_zwyz * a_zwyz - ((a_wyzw * a_wyzw) ^ f32x4::set_scalar(-0.0)))
 }
 
 // Apply a translator to a plane.
@@ -143,7 +123,7 @@ pub unsafe fn sw30(a: __m128, b: __m128) -> __m128 {
 // b * a * ~b
 // The low component of p2 is expected to be the scalar component instead
 #[inline(always)]
-pub unsafe fn sw02(a: __m128, b: __m128) -> __m128 {
+pub fn sw02(a: f32x4, b: f32x4) -> f32x4 {
     // (a0 b0^2 + 2a1 b0 b1 + 2a2 b0 b2 + 2a3 b0 b3) e0 +
     // (a1 b0^2) e1 +
     // (a2 b0^2) e2 +
@@ -164,16 +144,12 @@ pub unsafe fn sw02(a: __m128, b: __m128) -> __m128 {
     // normal.
 
     // a1*b1 + a2*b2 + a3*b3 stored in the low component of tmp
-    let tmp = hi_dp(a, b);
-
-    let inv_b = rcp_nr1(b.into()).0;
     // 2 / b0
-    let inv_b = _mm_add_ss(inv_b, inv_b);
-    let inv_b = _mm_and_ps(inv_b, _mm_castsi128_ps(_mm_set_epi32(0, 0, 0, -1)));
-    let tmp = _mm_mul_ss(tmp, inv_b);
-
     // Add to the plane
-    _mm_add_ps(a, tmp)
+
+    let inv_b = b.rcp_nr1();
+    let inv_b = inv_b.add_scalar(inv_b) & f32x4::cast_i32(0, 0, 0, -1);
+    a + f32x4::hi_dp(a, b).mul_scalar(inv_b)
 }
 
 // Apply a translator to a line

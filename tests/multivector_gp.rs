@@ -266,33 +266,28 @@ fn translator_mul_motor() {
     assert_eq!(m1, m2);
 }
 
-/*
-SUBCASE("motor*motor")
-{
-    motor m1{2, 3, 4, 5, 6, 7, 8, 9};
-    motor m2{6, 7, 8, 9, 10, 11, 12, 13};
-    motor m3 = m1 * m2;
-    assert_eq!(m3.scalar(), -86.0);
-    assert_eq!(m3.e23(), 36.0);
-    assert_eq!(m3.e31(), 32.0);
-    assert_eq!(m3.e12(), 52.0);
-    assert_eq!(m3.e01(), -38.0);
-    assert_eq!(m3.e02(), -76.0);
-    assert_eq!(m3.e03(), -66.0);
-    assert_eq!(m3.e0123(), 384.0);
-}
+#[test]
+fn motor_motor() {
+    let m1 = Motor::new(2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0);
+    let m2 = Motor::new(6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0);
 
-SUBCASE("motor/motor")
-{
-    motor m1{2, 3, 4, 5, 6, 7, 8, 9};
-    motor m2 = m1 / m1;
-    assert_eq!(m2.scalar(), doctest::Approx(1.0));
-    assert_eq!(m2.e23(), 0.0);
-    assert_eq!(m2.e31(), 0.0);
-    assert_eq!(m2.e12(), 0.0);
-    assert_eq!(m2.e01(), 0.0);
-    assert_eq!(m2.e02(), doctest::Approx(0.0));
-    assert_eq!(m2.e03(), doctest::Approx(0.0));
-    assert_eq!(m2.e0123(), doctest::Approx(0.0));
+    let mul: Motor = m1 * m2;
+    assert_eq!(mul.scalar(), -86.0);
+    assert_eq!(mul.e23(), 36.0);
+    assert_eq!(mul.e31(), 32.0);
+    assert_eq!(mul.e12(), 52.0);
+    assert_eq!(mul.e01(), -38.0);
+    assert_eq!(mul.e02(), -76.0);
+    assert_eq!(mul.e03(), -66.0);
+    assert_eq!(mul.e0123(), 384.0);
+
+    let div: Motor = m1 / m1;
+    abs_diff_eq!(div.scalar(), 1.0);
+    assert_eq!(div.e23(), 0.0);
+    assert_eq!(div.e31(), 0.0);
+    assert_eq!(div.e12(), 0.0);
+    assert_eq!(div.e01(), 0.0);
+    abs_diff_eq!(div.e02(), 0.0);
+    abs_diff_eq!(div.e03(), 0.0);
+    abs_diff_eq!(div.e0123(), 0.0);
 }
-*/

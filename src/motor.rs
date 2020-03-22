@@ -56,7 +56,7 @@
 //! between two motors is provided in a test case
 //! [here](https://github.com/jeremyong/Klein/blob/master/test/test_exp_log.cpp#L48).
 
-use crate::{Plane, Point};
+use crate::{arch::f32x4, Plane, Point, Rotor, Translator};
 use core::arch::x86_64::*;
 
 #[derive(Clone, Copy)]
@@ -110,31 +110,24 @@ impl Motor {
         : p1_{p1}
         , p2_{p2}
     {}
+    */
 
-    explicit KLN_VEC_CALL motor(rotor r) noexcept
-        : p1_{r.p1_}
-        , p2_{_mm_setzero_ps()}
-    {}
-
-    explicit KLN_VEC_CALL motor(translator t) noexcept
-        : p1_{_mm_set_ss(1.0)}
-        , p2_{t.p2_}
-    {}
-
-    motor& KLN_VEC_CALL operator=(rotor r) noexcept
-    {
-        p1_ = r.p1_;
-        p2_ = _mm_setzero_ps();
-        return *this;
+    #[inline]
+    pub fn from_rotor(r: Rotor) -> Self {
+        Self {
+            p1: r.p1,
+            p2: f32x4::zero().into(),
+        }
     }
 
-    motor& KLN_VEC_CALL operator=(translator t) noexcept
-    {
-        p1_ = _mm_setzero_ps();
-        p2_ = t.p2_;
-        return *this;
+    pub fn from_translator(t: Translator) -> Self {
+        Self {
+            p1: f32x4::set_scalar(1.0).into(),
+            p2: t.p2,
+        }
     }
 
+    /*
     /// Load motor data using two unaligned loads. This routine does *not*
     /// assume the data passed in this way is normalized.
     void load(float* in) noexcept

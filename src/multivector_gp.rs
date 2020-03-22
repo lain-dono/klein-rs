@@ -225,15 +225,10 @@ impl_gp!(|b: Motor, a: Translator| -> Motor {
     }
 });
 
-/*
 /// Compose the action of two motors (`b` will be applied, then `a`)
-motor operator*(motor a, motor b) noexcept
-{
-    motor out;
-    detail::gpMM(a.p1_, b.p1_, &out.p1_);
-    return out;
-}
-*/
+impl_gp!(|a: Motor, b: Motor| -> Motor {
+    Motor::from(gp_mm(a.p1, a.p2, b.p1, b.p2))
+});
 
 use crate::arch::sse::*;
 use core::arch::x86_64::*;
@@ -388,8 +383,7 @@ pub unsafe fn gp11(a: __m128, b: __m128) -> __m128 {
     let tmp2 = _mm_mul_ps(swizzle!(a, 2, 1, 3, 3), swizzle!(b, 1, 3, 2, 3));
     let tmp = _mm_xor_ps(_mm_add_ps(tmp1, tmp2), _mm_set_ss(-0.0));
 
-    let p1 = _mm_add_ps(p1, tmp);
-    p1
+    _mm_add_ps(p1, tmp)
 }
 
 // p3: (e123, e021, e013, e032)
@@ -444,15 +438,13 @@ pub unsafe fn gp_rt_true(a: __m128, b: __m128) -> __m128 {
         p2,
         _mm_mul_ps(swizzle!(a, 1, 3, 2, 2), swizzle!(b, 2, 1, 3, 2)),
     );
-    let p2 = _mm_sub_ps(
+    _mm_sub_ps(
         p2,
         _mm_xor_ps(
             _mm_set_ss(-0.0),
             _mm_mul_ps(swizzle!(a, 2, 1, 3, 3), swizzle!(b, 1, 3, 2, 3)),
         ),
-    );
-
-    p2
+    )
 }
 
 pub unsafe fn gp_rt_false(a: __m128, b: __m128) -> __m128 {
@@ -492,7 +484,7 @@ pub unsafe fn gp12_false(a: __m128, b: __m128) -> __m128 {
 }
 
 // Optimized motor * motor operation
-pub unsafe fn gpMM(m1: &[__m128; 2], m2: &[__m128; 2], out: &mut [__m128; 2]) {
+pub unsafe fn gp_mm(a: __m128, b: __m128, c: __m128, d: __m128) -> (__m128, __m128) {
     // (a0 c0 - a1 c1 - a2 c2 - a3 c3) +
     // (a0 c1 + a3 c2 + a1 c0 - a2 c3) e23 +
     // (a0 c2 + a1 c3 + a2 c0 - a3 c1) e31 +
@@ -507,40 +499,34 @@ pub unsafe fn gpMM(m1: &[__m128; 2], m2: &[__m128; 2], out: &mut [__m128; 2]) {
     // (a0 d3 + b3 c0 + a2 d1 + b2 c1 - a3 d0 - a1 d2 - b0 c3 - b1 c2)
     //  e03
 
-    let a = &m1[0];
-    let d = &m1[1];
-    let b = &m2[0];
-    let c = &m2[1];
-
-    let e = &mut *out.as_mut_ptr();
-    let f = &mut *out.as_mut_ptr().add(1);
-
-    let a_xxxx = swizzle!(*a, 0, 0, 0, 0);
-    let a_zyzw = swizzle!(*a, 3, 2, 1, 2);
-    let a_ywyz = swizzle!(*a, 2, 1, 3, 1);
-    let a_wzwy = swizzle!(*a, 1, 3, 2, 3);
-    let c_wwyz = swizzle!(*c, 2, 1, 3, 3);
-    let c_yzwy = swizzle!(*c, 1, 3, 2, 1);
+    let a_xxxx = swizzle!(a, 0, 0, 0, 0);
+    let a_zyzw = swizzle!(a, 3, 2, 1, 2);
+    let a_ywyz = swizzle!(a, 2, 1, 3, 1);
+    let a_wzwy = swizzle!(a, 1, 3, 2, 3);
+    let c_wwyz = swizzle!(c, 2, 1, 3, 3);
+    let c_yzwy = swizzle!(c, 1, 3, 2, 1);
     let s_flip = _mm_set_ss(-0.0);
 
-    *e = _mm_mul_ps(a_xxxx, *c);
-    let t = _mm_mul_ps(a_ywyz, c_yzwy);
-    let t = _mm_add_ps(t, _mm_mul_ps(a_zyzw, swizzle!(*c, 0, 0, 0, 2)));
-    let t = _mm_xor_ps(t, s_flip);
-    *e = _mm_add_ps(*e, t);
-    *e = _mm_sub_ps(*e, _mm_mul_ps(a_wzwy, c_wwyz));
+    let p1 = _mm_mul_ps(a_xxxx, c);
+    let tmp = _mm_mul_ps(a_ywyz, c_yzwy);
+    let tmp = _mm_add_ps(tmp, _mm_mul_ps(a_zyzw, swizzle!(c, 0, 0, 0, 2)));
+    let tmp = _mm_xor_ps(tmp, s_flip);
+    let p1 = _mm_add_ps(p1, tmp);
+    let p1 = _mm_sub_ps(p1, _mm_mul_ps(a_wzwy, c_wwyz));
 
-    *f = _mm_mul_ps(a_xxxx, *d);
-    *f = _mm_add_ps(*f, _mm_mul_ps(*b, swizzle!(*c, 0, 0, 0, 0)));
-    *f = _mm_add_ps(*f, _mm_mul_ps(a_ywyz, swizzle!(*d, 1, 3, 2, 1)));
-    *f = _mm_add_ps(*f, _mm_mul_ps(swizzle!(*b, 2, 1, 3, 1), c_yzwy));
-    let t = _mm_mul_ps(a_zyzw, swizzle!(*d, 0, 0, 0, 2));
-    let t = _mm_add_ps(t, _mm_mul_ps(a_wzwy, swizzle!(*d, 2, 1, 3, 3)));
-    let t = _mm_add_ps(
-        t,
-        _mm_mul_ps(swizzle!(*b, 0, 0, 0, 2), swizzle!(*c, 3, 2, 1, 2)),
+    let p2 = _mm_mul_ps(a_xxxx, d);
+    let p2 = _mm_add_ps(p2, _mm_mul_ps(b, swizzle!(c, 0, 0, 0, 0)));
+    let p2 = _mm_add_ps(p2, _mm_mul_ps(a_ywyz, swizzle!(d, 1, 3, 2, 1)));
+    let p2 = _mm_add_ps(p2, _mm_mul_ps(swizzle!(b, 2, 1, 3, 1), c_yzwy));
+    let tmp = _mm_mul_ps(a_zyzw, swizzle!(d, 0, 0, 0, 2));
+    let tmp = _mm_add_ps(tmp, _mm_mul_ps(a_wzwy, swizzle!(d, 2, 1, 3, 3)));
+    let tmp = _mm_add_ps(
+        tmp,
+        _mm_mul_ps(swizzle!(b, 0, 0, 0, 2), swizzle!(c, 3, 2, 1, 2)),
     );
-    let t = _mm_add_ps(t, _mm_mul_ps(swizzle!(*b, 1, 3, 2, 3), c_wwyz));
-    let t = _mm_xor_ps(t, s_flip);
-    *f = _mm_sub_ps(*f, t);
+    let tmp = _mm_add_ps(tmp, _mm_mul_ps(swizzle!(b, 1, 3, 2, 3), c_wwyz));
+    let tmp = _mm_xor_ps(tmp, s_flip);
+    let p2 = _mm_sub_ps(p2, tmp);
+
+    (p1, p2) // e f
 }

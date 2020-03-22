@@ -1,19 +1,19 @@
-use klein::{Line, Plane, Point};
+use klein::{
+    arch::{f32x4, sw02},
+    Line, Plane, Point,
+};
 
 #[test]
 fn simd_sandwich() {
-    unsafe {
-        use core::arch::x86_64::*;
-        let a = _mm_set_ps(4.0, 3.0, 2.0, 1.0);
-        let b = _mm_set_ps(-1.0, -2.0, -3.0, -4.0);
-        let mut ab = [0.0f32; 4];
-        _mm_store_ps(ab.as_mut_ptr(), klein::arch::sw02(a, b));
+    let a = f32x4::new(4.0, 3.0, 2.0, 1.0);
+    let b = f32x4::new(-1.0, -2.0, -3.0, -4.0);
 
-        assert_eq!(ab[0], 9.0);
-        assert_eq!(ab[1], 2.0);
-        assert_eq!(ab[2], 3.0);
-        assert_eq!(ab[3], 4.0);
-    }
+    let ab = sw02(a, b).into_array();
+
+    assert_eq!(ab[0], 9.0);
+    assert_eq!(ab[1], 2.0);
+    assert_eq!(ab[2], 3.0);
+    assert_eq!(ab[3], 4.0);
 }
 
 #[test]
@@ -54,15 +54,13 @@ fn reflect_point() {
 }
 
 /*
-TEST_CASE("rotor-line")
-{
+#[test]
+fn rotor_line() {
     // Make an unnormalized rotor to verify correctness
-    float data[4] = {1.0, 4.0, -3.0, 2.0};
-    rotor r;
-    r.load_normalized(data);
+    let r = Rotor::.load_normalized([1.0, 4.0, -3.0, 2.0]);
     // a*e01 + b*e01 + c*e02 + d*e23 + e*e31 + f*e12
-    line l1{-1.0, 2.0, -3.0, -6.0, 5.0, 4.0};
-    line l2{r(l1)};
+    let l1 = Line::new(-1.0, 2.0, -3.0, -6.0, 5.0, 4.0);
+    let l2: Line = r. {r(l1)};
     assert_eq!(l2.e01(), -110.0);
     assert_eq!(l2.e02(), 20.0);
     assert_eq!(l2.e03(), 10.0);

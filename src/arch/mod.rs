@@ -194,6 +194,23 @@ impl f32x4 {
 }
 
 impl f32x4 {
+    pub fn bit_eq(self, other: Self) -> bool {
+        unsafe { _mm_movemask_ps(_mm_cmpeq_ps(self.0, other.0)) == 0b1111 }
+    }
+
+    pub fn approx_eq(self, other: Self, epsilon: f32) -> bool {
+        unsafe {
+            let eps = _mm_set1_ps(epsilon);
+            let cmp = _mm_cmplt_ps(
+                _mm_andnot_ps(_mm_set1_ps(-0.0), _mm_sub_ps(self.0, other.0)),
+                eps,
+            );
+            _mm_movemask_ps(cmp) != 0b1111
+        }
+    }
+}
+
+impl f32x4 {
     #[inline(always)]
     pub fn rcp_nr1(self) -> Self {
         rcp_nr1(self)

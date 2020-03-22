@@ -9,7 +9,7 @@
 //! that reside on the plane satisfy the familiar equation
 //! $d + ax + by + cz = 0$.
 
-use super::{Line, Point};
+use super::{arch::f32x4, Line, Point};
 use core::arch::x86_64::*;
 
 #[derive(Clone, Copy)]
@@ -19,7 +19,7 @@ pub struct Plane {
 
 impl Plane {
     pub fn new(a: f32, b: f32, c: f32, d: f32) -> Self {
-        Self::from(unsafe { _mm_set_ps(c, b, a, d) })
+        Self::from(f32x4::new(c, b, a, d))
     }
 
     /// Unaligned load of data. The `data` argument should point to 4 floats
@@ -32,7 +32,7 @@ impl Plane {
     /// This is a faster mechanism for setting data compared to setting
     /// components one at a time.
     pub fn load(&mut self, data: [f32; 4]) {
-        unsafe { self.p0 = _mm_loadu_ps(data.as_ptr()) }
+        self.p0 = f32x4::from_array(data).into();
     }
 
     /// Normalize this plane `p` such that $p \cdot p = 1$.
@@ -42,16 +42,12 @@ impl Plane {
     /// normalized rotor between two planes with the geometric product `*` also
     /// requires that the planes are normalized.
     pub fn normalize(&mut self) {
-        unsafe {
-            use crate::arch::{hi_dp_bc, rsqrt_nr1};
-            let inv_norm = rsqrt_nr1(hi_dp_bc(self.p0, self.p0));
-            let inv_norm = if cfg!(target_feature = "sse4.1") {
-                _mm_blend_ps(inv_norm, _mm_set_ss(1.0), 1)
-            } else {
-                _mm_add_ps(inv_norm, _mm_set_ss(1.0))
-            };
-            self.p0 = _mm_mul_ps(inv_norm, self.p0);
-        }
+        let p0 = f32x4::from(self.p0);
+        let inv_norm = f32x4::hi_dp_bc(p0, p0)
+            .rsqrt_nr1()
+            .blend1(f32x4::set_scalar(1.0));
+
+        self.p0 = (inv_norm * p0).into();
     }
 
     /// Return a normalized copy of this plane.
@@ -67,22 +63,14 @@ impl Plane {
     /// $P\vee\ell$ containing both $\ell$ and $P$ will have a norm equivalent
     /// to the distance between $P$ and $\ell$.
     pub fn norm(self) -> f32 {
-        unsafe {
-            let mut out = core::mem::uninitialized();
-            _mm_store_ss(
-                &mut out,
-                crate::arch::sqrt_nr1(crate::arch::hi_dp(self.p0, self.p0)),
-            );
-            out
-        }
+        let p0 = f32x4::from(self.p0);
+        f32x4::hi_dp(p0, p0).sqrt_nr1().first()
     }
 
     pub fn invert(&mut self) {
-        unsafe {
-            let inv_norm = crate::arch::rsqrt_nr1(crate::arch::hi_dp_bc(self.p0, self.p0));
-            self.p0 = _mm_mul_ps(inv_norm, self.p0);
-            self.p0 = _mm_mul_ps(inv_norm, self.p0);
-        }
+        let p0 = f32x4::from(self.p0);
+        let inv_norm = f32x4::hi_dp_bc(p0, p0).rsqrt_nr1();
+        self.p0 = (p0 * inv_norm * inv_norm).into();
     }
 
     pub fn inverse(mut self) -> Self {
@@ -116,18 +104,17 @@ impl Plane {
     /// performed via this call operator is an optimized routine equivalent to
     /// the expression $p \ell p$.
     pub fn reflect_line(self, line: Line) -> Line {
-        unsafe {
-            let (p1, p2) = crate::arch::sw10(self.p0, line.p1);
-            let p2 = _mm_add_ps(p2, crate::arch::sw20(self.p0, line.p2));
+        let (p0, p1) = (self.p0.into(), line.p1.into());
+        let (p1, p2) = crate::arch::sw10(p0, p1);
+        let p2 = p2 + crate::arch::sw20(p0, line.p2.into());
 
-            Line { p1: p1.into(), p2: p2.into() }
-        }
+        Line::from((p1, p2))
     }
 
     /// Reflect the point $P$ through this plane $p$. The operation
     /// performed via this call operator is an optimized routine equivalent to
     /// the expression $p P p$.
     pub fn reflect_point(self, p: Point) -> Point {
-        Point::from(unsafe { crate::arch::sw30(self.p0, p.p3) })
+        Point::from(crate::arch::sw30(self.p0.into(), p.p3.into()))
     }
 }
