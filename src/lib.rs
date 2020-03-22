@@ -1,5 +1,6 @@
 #![feature(stdarch)]
 #![allow(deprecated, non_snake_case, unused_unsafe)]
+#![warn(clippy::all)]
 
 #[macro_use]
 pub mod arch;
