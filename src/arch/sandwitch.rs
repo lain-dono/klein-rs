@@ -210,11 +210,11 @@ pub fn sw32(a: f32x4, b: f32x4) -> f32x4 {
 // Note: in and out are permitted to alias iff a == out.
 
 //template <bool Variadic, bool Translate, bool InputP2>
-pub unsafe fn sw_mm<'a>(
-    input: impl Iterator<Item = &'a __m128>,
-    b: __m128,
-    c: Option<&'a __m128>,
-    out: impl Iterator<Item = &'a mut __m128>,
+pub unsafe fn sw_mm1<'a>(
+    input: impl Iterator<Item = &'a f32x4>,
+    b: f32x4,
+    c: Option<&'a f32x4>,
+    output: impl Iterator<Item = &'a mut f32x4>,
 ) {
     // p1 block
     // a0(b0^2 + b1^2 + b2^2 + b3^2) +
@@ -283,12 +283,128 @@ pub unsafe fn sw_mm<'a>(
     // tmp3 scaled by (d0, d3, d1, d2) and added to p2
 
     // Translation
-    // tmp4; // scaled by a and added to p2
-    // tmp5; // scaled by (a0, a3, a1, a2), added to p2
-    // tmp6; // scaled by (a0, a2, a3, a1), added to p2
 
     let translate = c.is_some();
 
+    // tmp4; // scaled by a and added to p2
+    // tmp5; // scaled by (a0, a3, a1, a2), added to p2
+    // tmp6; // scaled by (a0, a2, a3, a1), added to p2
+    let (tmp4, tmp5, tmp6) = if let Some(c) = c {
+        let c = f32x4::from(*c);
+        let czero = shuffle!(c, [0, 0, 0, 0]);
+        let c_xzwy = shuffle!(c, [1, 3, 2, 0]);
+        let c_xwyz = shuffle!(c, [2, 1, 3, 0]);
+
+        let tmp4 = b * c - b_yxxx * shuffle!(c, [0, 0, 0, 1]);
+        let tmp4 = tmp4 - shuffle!(b, [1, 3, 3, 2]) * shuffle!(c, [1, 3, 3, 2]);
+        let tmp4 = tmp4 - shuffle!(b, [2, 1, 2, 3]) * shuffle!(c, [2, 1, 2, 3]);
+        let tmp4 = tmp4 + tmp4;
+
+        let tmp5 = (b * c_xwyz + b_xzwy * czero + b_xwyz * c - b_xxxx * c_xzwy) * scale;
+        let tmp6 = (b * c_xzwy + b_xxxx * c_xwyz + b_xzwy * c - b_xwyz * czero) * scale;
+
+        (tmp4, tmp5, tmp6)
+    } else {
+        core::mem::uninitialized()
+    };
+
+    for (&p1_in, p1_out) in input.zip(output) {
+        let p1_in_xzwy = shuffle!(p1_in, [1, 3, 2, 0]);
+        let p1_in_xwyz = shuffle!(p1_in, [2, 1, 3, 0]);
+
+        *p1_out = tmp * p1_in + tmp2 * p1_in_xzwy + tmp3 * p1_in_xwyz;
+
+        /*
+        // If what is being applied is a rotor, the non-directional
+        // components of the line are left untouched
+        if translate {
+            let & p2_out = out[2 * i + 1];
+            p2_out         = _mm_add_ps(p2_out, _mm_mul_ps(tmp4, p1_in));
+            p2_out = _mm_add_ps(p2_out, _mm_mul_ps(tmp5, p1_in_xwyz));
+            p2_out = _mm_add_ps(p2_out, _mm_mul_ps(tmp6, p1_in_xzwy));
+        }
+        */
+    }
+}
+pub unsafe fn sw_mm2<'a>(
+    input: impl Iterator<Item = &'a (__m128, __m128)>,
+    b: __m128,
+    c: Option<&'a __m128>,
+    out: impl Iterator<Item = &'a mut (__m128, __m128)>,
+) {
+    // p1 block
+    // a0(b0^2 + b1^2 + b2^2 + b3^2) +
+    // (a1(b1^2 + b0^2 - b3^2 - b2^2) +
+    //     2a2(b0 b3 + b1 b2) + 2a3(b1 b3 - b0 b2)) e23 +
+    // (a2(b2^2 + b0^2 - b1^2 - b3^2) +
+    //     2a3(b0 b1 + b2 b3) + 2a1(b2 b1 - b0 b3)) e31
+    // (a3(b3^2 + b0^2 - b2^2 - b1^2) +
+    //     2a1(b0 b2 + b3 b1) + 2a2(b3 b2 - b0 b1)) e12 +
+
+    let b = f32x4::from(b);
+
+    let b_xwyz = shuffle!(b, [2, 1, 3, 0]);
+    let b_xzwy = shuffle!(b, [1, 3, 2, 0]);
+    let b_yxxx = shuffle!(b, [0, 0, 0, 1]);
+    let b_yxxx_2 = b_yxxx * b_yxxx;
+
+    let tmp = b * b + b_yxxx_2;
+
+    let b_tmp = shuffle!(b, [2, 1, 3, 2]);
+    let tmp2 = b_tmp * b_tmp;
+
+    let b_tmp = shuffle!(b, [1, 3, 2, 3]);
+    let tmp2 = tmp2 + b_tmp * b_tmp;
+    let tmp = tmp - (tmp2 ^ f32x4::all(-0.0));
+    // tmp needs to be scaled by a and set to p1_out
+
+    let b_xxxx = shuffle!(b, [0, 0, 0, 0]);
+    let scale = f32x4::new(2.0, 2.0, 2.0, 0.0);
+    let tmp2 = (b_xxxx * b_xwyz + b * b_xzwy) * scale;
+    // tmp2 needs to be scaled by (a0, a2, a3, a1) and added to p1_out
+
+    let tmp3 = (b * b_xwyz - b_xxxx * b_xzwy) * scale;
+    // tmp3 needs to be scaled by (a0, a3, a1, a2) and added to p1_out
+
+    // p2 block
+    // (d coefficients are the components of the input line p2)
+    // (2a0(b0 c0 - b1 c1 - b2 c2 - b3 c3) +
+    //  d0(b1^2 + b0^2 + b2^2 + b3^2)) e0123 +
+    //
+    // (2a1(b1 c1 - b0 c0 - b3 c3 - b2 c2) +
+    //  2a3(b1 c3 + b2 c0 + b3 c1 - b0 c2) +
+    //  2a2(b1 c2 + b0 c3 + b2 c1 - b3 c0) +
+    //  2d2(b0 b3 + b2 b1) +
+    //  2d3(b1 b3 - b0 b2) +
+    //  d1(b0^2 + b1^2 - b3^2 - b2^2)) e01 +
+    //
+    // (2a2(b2 c2 - b0 c0 - b3 c3 - b1 c1) +
+    //  2a1(b2 c1 + b3 c0 + b1 c2 - b0 c3) +
+    //  2a3(b2 c3 + b0 c1 + b3 c2 - b1 c0) +
+    //  2d3(b0 b1 + b3 b2) +
+    //  2d1(b2 b1 - b0 b3) +
+    //  d2(b0^2 + b2^2 - b1^2 - b3^2)) e02 +
+    //
+    // (2a3(b3 c3 - b0 c0 - b1 c1 - b2 c2) +
+    //  2a2(b3 c2 + b1 c0 + b2 c3 - b0 c1) +
+    //  2a1(b3 c1 + b0 c2 + b1 c3 - b2 c0) +
+    //  2d1(b0 b2 + b1 b3) +
+    //  2d2(b3 b2 - b0 b1) +
+    //  d3(b0^2 + b3^2 - b2^2 - b1^2)) e03
+
+    // Rotation
+
+    // tmp scaled by d and added to p2
+    // tmp2 scaled by (d0, d2, d3, d1) and added to p2
+    // tmp3 scaled by (d0, d3, d1, d2) and added to p2
+
+    // Translation
+
+    let translate = c.is_some();
+
+    // tmp4; // scaled by a and added to p2
+    // tmp5; // scaled by (a0, a3, a1, a2), added to p2
+    // tmp6; // scaled by (a0, a2, a3, a1), added to p2
     let (tmp4, tmp5, tmp6) = if let Some(c) = c {
         let c = f32x4::from(*c);
         let czero = shuffle!(c, [0, 0, 0, 0]);

@@ -7,7 +7,7 @@ impl Line {
     /// or accelerate the motor's action. The line need not be a _simple bivector_
     /// for the operation to be well-defined.
     pub fn exp(self) -> Motor {
-        Motor::from(unsafe { crate::arch::exp(self.p1, self.p2) })
+        Motor::from(crate::arch::exp(self.p1.into(), self.p2.into()))
     }
 }
 
@@ -43,6 +43,7 @@ impl IdealLine {
 
 impl Branch {
     /// Exponentiate a branch to produce a rotor.
+    #[inline]
     pub fn exp(self) -> Rotor {
         let p1 = f32x4::from(self.p1);
 
@@ -56,10 +57,8 @@ impl Branch {
 
     #[inline]
     pub fn sqrt(self) -> Rotor {
-        let p1 = f32x4::from(self.p1)
-            .add_scalar(f32x4::set_scalar(1.0))
-            .into();
-        Rotor { p1 }.normalized()
+        let p1 = f32x4::from(self.p1).add_scalar(f32x4::set_scalar(1.0));
+        Rotor { p1: p1.into() }.normalized()
     }
 }
 
@@ -99,7 +98,7 @@ impl Rotor {
 impl Motor {
     #[inline]
     pub fn log(self) -> Line {
-        Line::from(unsafe { crate::arch::log(self.p1, self.p2) })
+        Line::from(crate::arch::log(self.p1.into(), self.p2.into()))
     }
 
     /// Compute the square root of the provided motor.

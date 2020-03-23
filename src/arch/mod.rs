@@ -83,6 +83,7 @@ impl std::ops::Mul<f32> for f32x4 {
 impl std::ops::Div<f32> for f32x4 {
     type Output = Self;
     #[inline(always)]
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn div(self, s: f32) -> Self {
         self * Self::all(s).rcp_nr1()
     }

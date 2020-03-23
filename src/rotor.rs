@@ -1,4 +1,4 @@
-use crate::{arch::f32x4, Direction, Plane, Point};
+use crate::{arch::f32x4, arch::*, Branch, Direction, Plane, Point};
 use core::arch::x86_64::*;
 
 #[derive(Clone, Copy)]
@@ -170,13 +170,18 @@ impl Rotor {
     }
 
     /*
-    [[nodiscard]] branch KLN_VEC_CALL operator()(branch const& b) const noexcept
-    {
-        branch out;
-        detail::swMM<false, false, false>(&b.p1_, p1_, nullptr, &out.p1_);
-        return out;
-    }
+    pub fn conj_branch(&self, b: Branch) -> Branch {
+        unsafe {
+            use core::iter::once;
 
+            let out: Branch = core::mem::uninitialized();
+            sw_mm1(once(&b.p1), self.p1, None, once(&mut out.p1));
+            out
+        }
+    }
+    */
+
+    /*
     /// Conjugates a line $\ell$ with this rotor and returns the result
     /// $r\ell \widetilde{r}$.
     [[nodiscard]] line KLN_VEC_CALL operator()(line const& l) const noexcept
