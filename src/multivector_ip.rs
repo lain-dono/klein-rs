@@ -15,16 +15,13 @@ macro_rules! impl_dot {
     };
 }
 
-impl_dot!(|a: Plane, b: Plane| -> f32 { f32x4::hi_dp(a.p0.into(), b.p0.into()).first() });
+impl_dot!(|a: Plane, b: Plane| -> f32 { f32x4::hi_dp(a.p0, b.p0).first() });
 impl_dot!(|a: Line, b: Line| -> f32 {
-    (f32x4::all(-0.0) ^ f32x4::hi_dp_ss(a.p1.into(), b.p1.into())).first()
+    (f32x4::all(-0.0) ^ f32x4::hi_dp_ss(a.p1, b.p1)).first()
 });
 impl_dot!(|a: Point, b: Point| -> f32 {
     // -a0 b0
-    let a = f32x4::from(a.p3);
-    let b = f32x4::from(b.p3);
-
-    (f32x4::all(-1.0) * (a * b)).first()
+    (f32x4::all(-1.0) * (a.p3 * b.p3)).first()
 });
 
 impl_dot!(|a: Plane, b: Line| -> Plane {
@@ -96,8 +93,7 @@ impl_dot!(|a: Point, b: Line| -> Plane {
     // -a0 b2 e2 +
     // -a0 b3 e3
 
-    let a = f32x4::from(a.p3);
-    let b = f32x4::from(b.p1);
+    let (a, b) = (a.p3, b.p1);
 
     let p0 = (b * shuffle!(a, [0, 0, 0, 0])) ^ f32x4::new(-0.0, -0.0, -0.0, 0.0);
 

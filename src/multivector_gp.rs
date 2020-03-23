@@ -28,12 +28,12 @@ macro_rules! impl_gp {
     };
 }
 
-impl_gp!(|a: Plane, b: Plane| -> Motor { Motor::from(gp00(a.p0, b.p0)) });
-impl_gp!(|a: Plane, b: Point| -> Motor { Motor::from(gp03_false(a.p0, b.p3)) });
-impl_gp!(|b: Point, a: Plane| -> Motor { Motor::from(gp03_true(a.p0, b.p3)) });
+impl_gp!(|a: Plane, b: Plane| -> Motor { Motor::from(gp00(a.p0.into(), b.p0.into())) });
+impl_gp!(|a: Plane, b: Point| -> Motor { Motor::from(gp03_false(a.p0.into(), b.p3.into())) });
+impl_gp!(|b: Point, a: Plane| -> Motor { Motor::from(gp03_true(a.p0.into(), b.p3.into())) });
 
 /// Generate a rotor `r` such that `\widetilde{\sqrt{r}}` takes branch `b` to branch `a`.
-impl_gp!(|a: Branch, b: Branch| -> Rotor { Rotor::from(gp11(a.p1, b.p1)) });
+impl_gp!(|a: Branch, b: Branch| -> Rotor { Rotor::from(gp11(a.p1.into(), b.p1.into())) });
 
 /// Generates a motor $m$ that produces a screw motion about the common normal
 /// to lines $a$ and $b$. The motor given by $\sqrt{m}$ takes $b$ to $a$
@@ -75,18 +75,18 @@ impl_gp!(|a: Line, b: Line| -> Motor {
 
 /// Generates a translator $t$ that produces a displacement along the line
 /// between points $a$ and $b$. The translator given by $\sqrt{t}$ takes $b$ to `a`.
-impl_gp!(|a: Point, b: Point| -> Translator { Translator::from(gp33(a.p3, b.p3)) });
+impl_gp!(|a: Point, b: Point| -> Translator { Translator::from(gp33(a.p3.into(), b.p3.into())) });
 
 /// Composes two rotational actions such that the produced rotor has the same
 /// effect as applying rotor $b$, then rotor $a$.
-impl_gp!(|a: Rotor, b: Rotor| -> Rotor { Rotor::from(gp11(a.p1, b.p1)) });
+impl_gp!(|a: Rotor, b: Rotor| -> Rotor { Rotor::from(gp11(a.p1.into(), b.p1.into())) });
 
 /// The product of a dual number and a line effectively weights the line with a
 /// rotational and translational quantity. Subsequent exponentiation will
 /// produce a motor along the screw axis of line $b$ with rotation and
 /// translation given by half the scalar and pseudoscalar parts of the dual
 /// number `a` respectively.
-impl_gp!(|a: Dual, b: Line| -> Line { Line::from(gp_dl(a.p, a.q, b.p1, b.p2)) });
+impl_gp!(|a: Dual, b: Line| -> Line { Line::from(gp_dl(a.p, a.q, b.p1.into(), b.p2.into())) });
 
 impl_gp!(|b: Line, a: Dual| -> Line { a * b });
 
@@ -94,7 +94,7 @@ impl_gp!(|b: Line, a: Dual| -> Line { a * b });
 impl_gp!(|a: Rotor, b: Translator| -> Motor {
     Motor {
         p1: a.p1,
-        p2: gp_rt_false(a.p1, b.p2),
+        p2: gp_rt_false(a.p1.0, b.p2.0).into(),
     }
 });
 
@@ -102,7 +102,7 @@ impl_gp!(|a: Rotor, b: Translator| -> Motor {
 impl_gp!(|b: Translator, a: Rotor| -> Motor {
     Motor {
         p1: a.p1,
-        p2: gp_rt_true(a.p1, b.p2),
+        p2: gp_rt_true(a.p1.into(), b.p2.into()).into(),
     }
 });
 
@@ -113,16 +113,16 @@ impl_gp!(|a: Translator, b: Translator| -> Translator { a + b });
 /// Compose the action of a rotor and motor (`b` will be applied, then `a`)
 impl_gp!(|a: Rotor, b: Motor| -> Motor {
     Motor {
-        p1: gp11(a.p1, b.p1),
-        p2: gp12_false(a.p1, b.p2),
+        p1: gp11(a.p1.into(), b.p1.into()).into(),
+        p2: gp12_false(a.p1.into(), b.p2.into()).into(),
     }
 });
 
 /// Compose the action of a rotor and motor (`a` will be applied, then `b`)
 impl_gp!(|b: Motor, a: Rotor| -> Motor {
     Motor {
-        p1: gp11(b.p1, a.p1),
-        p2: gp12_true(a.p1, b.p2),
+        p1: gp11(b.p1.into(), a.p1.into()).into(),
+        p2: gp12_true(a.p1.into(), b.p2.into()).into(),
     }
 });
 
@@ -130,7 +130,7 @@ impl_gp!(|b: Motor, a: Rotor| -> Motor {
 impl_gp!(|a: Translator, b: Motor| -> Motor {
     Motor {
         p1: b.p1,
-        p2: _mm_add_ps(gp_rt_true(b.p1, a.p2), b.p2),
+        p2: _mm_add_ps(gp_rt_true(b.p1.into(), a.p2.into()), b.p2.into()).into(),
     }
 });
 
@@ -138,7 +138,7 @@ impl_gp!(|a: Translator, b: Motor| -> Motor {
 impl_gp!(|b: Motor, a: Translator| -> Motor {
     Motor {
         p1: b.p1,
-        p2: _mm_add_ps(gp_rt_false(b.p1, a.p2), b.p2),
+        p2: _mm_add_ps(gp_rt_false(b.p1.0, a.p2.0), b.p2.0).into(),
     }
 });
 

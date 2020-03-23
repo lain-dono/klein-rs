@@ -1,9 +1,8 @@
-use crate::{arch::f32x4, arch::*, Branch, Direction, Plane, Point};
-use core::arch::x86_64::*;
+use crate::{arch::f32x4, Branch, Direction, Plane, Point};
 
 #[derive(Clone, Copy)]
 pub struct Rotor {
-    pub(crate) p1: __m128,
+    pub(crate) p1: f32x4,
 }
 
 impl Rotor {
@@ -20,13 +19,8 @@ impl Rotor {
         let (sin, cos) = half.sin_cos();
 
         let scale = sin * inv_norm;
-
-        unsafe {
-            let p1 = _mm_set_ps(z, y, x, cos);
-            let p1 = _mm_mul_ps(p1, _mm_set_ps(scale, scale, scale, 1.0));
-
-            Self { p1 }
-        }
+        let p1 = f32x4::new(z, y, x, cos) * f32x4::new(scale, scale, scale, 1.0);
+        Self { p1 }
     }
 
     #[doc(hidden)]
@@ -44,19 +38,14 @@ impl Rotor {
     /// The rotor data loaded this way *must* be normalized. That is, the
     /// rotor $r$ must satisfy $r\widetilde{r} = 1$.
     pub fn load_normalized(data: [f32; 4]) -> Self {
-        Self {
-            p1: unsafe { _mm_loadu_ps(data.as_ptr()) },
-        }
+        Self::from(f32x4::from_array(data))
     }
 
     /// Normalize a rotor such that $\mathbf{r}\widetilde{\mathbf{r}} = 1$.
     pub fn normalize(&mut self) {
-        unsafe {
-            // A rotor is normalized if r * ~r is unity.
-            use crate::arch::{dp_bc, rsqrt_nr1};
-            let inv_norm = rsqrt_nr1(dp_bc(self.p1, self.p1));
-            self.p1 = _mm_mul_ps(self.p1, inv_norm);
-        }
+        // A rotor is normalized if r * r.reverse() is unity.
+        let inv_norm = f32x4::dp_bc(self.p1, self.p1).rsqrt_nr1();
+        self.p1 = self.p1 * inv_norm;
     }
 
     /// Return a normalized copy of this rotor
@@ -66,12 +55,10 @@ impl Rotor {
     }
 
     pub fn invert(&mut self) {
-        unsafe {
-            let inv_norm = crate::arch::rsqrt_nr1(crate::arch::hi_dp_bc(self.p1, self.p1));
-            self.p1 = _mm_mul_ps(self.p1, inv_norm);
-            self.p1 = _mm_mul_ps(self.p1, inv_norm);
-            self.p1 = _mm_xor_ps(_mm_set_ps(-0.0, -0.0, -0.0, 0.0), self.p1);
-        }
+        let inv_norm = f32x4::hi_dp_bc(self.p1, self.p1).rsqrt_nr1();
+        self.p1 = self.p1 * inv_norm;
+        self.p1 = self.p1 * inv_norm;
+        self.p1 = f32x4::new(-0.0, -0.0, -0.0, 0.0) ^ self.p1;
     }
 
     pub fn inverse(mut self) -> Self {
@@ -81,10 +68,8 @@ impl Rotor {
 
     /// Constrains the rotor to traverse the shortest arc
     pub fn constrain(&mut self) {
-        unsafe {
-            let mask = swizzle!(_mm_and_ps(self.p1, _mm_set_ss(-0.0)), 0, 0, 0, 0);
-            self.p1 = _mm_xor_ps(mask, self.p1);
-        }
+            let mask = shuffle!(self.p1 & f32x4::set_scalar(-0.0), [0, 0, 0, 0]);
+            self.p1 = mask ^ self.p1;
     }
 
     pub fn constrained(mut self) -> Self {
@@ -93,7 +78,7 @@ impl Rotor {
     }
 
     pub fn reverse(&mut self) {
-        self.p1 = unsafe { _mm_xor_ps(self.p1, _mm_set_ps(-0.0, -0.0, -0.0, 0.0)) };
+        self.p1 = self.p1 ^ f32x4::new(-0.0, -0.0, -0.0, 0.0);
     }
 
     pub fn reversed(mut self) -> Self {
@@ -101,19 +86,12 @@ impl Rotor {
         self
     }
 
-    pub fn rotor_eq(&self, other: &Self) -> bool {
-        unsafe { _mm_movemask_ps(_mm_cmpeq_ps(self.p1, other.p1)) == 0b1111 }
+    pub fn rotor_eq(self, other: Self) -> bool {
+        f32x4::bit_eq(self.into(), other.into())
     }
 
-    pub fn rotor_approx_eq(&self, other: &Self, epsilon: f32) -> bool {
-        unsafe {
-            let eps = _mm_set1_ps(epsilon);
-            let cmp = _mm_cmplt_ps(
-                _mm_andnot_ps(_mm_set1_ps(-0.0), _mm_sub_ps(self.p1, other.p1)),
-                eps,
-            );
-            _mm_movemask_ps(cmp) != 0b1111
-        }
+    pub fn approx_eq(self, other: Self, epsilon: f32) -> bool {
+        f32x4::approx_eq(self.into(), other.into(), epsilon)
     }
 
     /*
@@ -143,7 +121,7 @@ impl Rotor {
         unsafe {
             use core::iter::once;
             let mut out: Plane = core::mem::uninitialized();
-            crate::arch::sw012(once(&p.p0), self.p1, None, once(&mut out.p0));
+            crate::arch::sw012(once(&p.p0), self.p1.into(), None, once(&mut out.p0));
             out
         }
     }
@@ -162,7 +140,7 @@ impl Rotor {
         unsafe {
             crate::arch::sw012(
                 input.iter().map(|d| &d.p0),
-                self.p1,
+                self.p1.into(),
                 None,
                 out.iter_mut().map(|d| &mut d.p0),
             )
@@ -213,7 +191,7 @@ impl Rotor {
         unsafe {
             use core::iter::once;
             let mut out: Point = core::mem::uninitialized();
-            crate::arch::sw012(once(&p.p3), self.p1, None, once(&mut out.p3));
+            crate::arch::sw012(once(&p.p3), self.p1.into(), None, once(&mut out.p3));
             out
         }
     }
@@ -232,7 +210,7 @@ impl Rotor {
         unsafe {
             crate::arch::sw012(
                 input.iter().map(|d| &d.p3),
-                self.p1,
+                self.p1.into(),
                 None,
                 out.iter_mut().map(|d| &mut d.p3),
             );
@@ -246,7 +224,7 @@ impl Rotor {
             use core::iter::once;
             let mut out: Direction = core::mem::uninitialized();
             // NOTE: Conjugation of a plane and point with a rotor is identical
-            crate::arch::sw012(once(&d.p3.0), self.p1, None, once(&mut out.p3.0));
+            crate::arch::sw012(once(&d.p3), self.p1.into(), None, once(&mut out.p3));
             out
         }
     }
@@ -264,10 +242,10 @@ impl Rotor {
         // NOTE: Conjugation of a plane and point with a rotor is identical
         unsafe {
             crate::arch::sw012(
-                input.iter().map(|d| &d.p3.0),
-                self.p1,
+                input.iter().map(|d| &d.p3),
+                self.p1.into(),
                 None,
-                out.iter_mut().map(|d| &mut d.p3.0),
+                out.iter_mut().map(|d| &mut d.p3),
             )
         }
     }

@@ -1,9 +1,8 @@
 use crate::{arch::f32x4, Line, Plane, Point};
-use core::arch::x86_64::*;
 
 #[derive(Clone, Copy)]
 pub struct Translator {
-    pub(crate) p2: __m128,
+    pub(crate) p2: f32x4,
 }
 
 impl Translator {
@@ -32,11 +31,11 @@ impl Translator {
     /// the quantity $`-\sqrt{a^2 + b^2 + c^2}`$ must be half the desired
     /// displacement.
     pub fn load_normalized(&mut self, data: [f32; 4]) {
-        self.p2 = unsafe { _mm_loadu_ps(data.as_ptr()) };
+        self.p2 = f32x4::from_array(data);
     }
 
     pub fn invert(&mut self) {
-        self.p2 = unsafe { _mm_xor_ps(_mm_set_ps(-0.0, -0.0, -0.0, 0.0), self.p2) };
+        self.p2 = f32x4::new(-0.0, -0.0, -0.0, 0.0) ^ self.p2;
     }
 
     pub fn inverse(mut self) -> Self {
@@ -47,25 +46,18 @@ impl Translator {
     /// Conjugates a plane $p$ with this translator and returns the result
     /// $tp\widetilde{t}$.
     pub fn conj_plane(&self, p: Plane) -> Plane {
-        unsafe {
-            let blend = if cfg!(target_feature = "sse4.1") {
-                _mm_blend_ps(self.p2, _mm_set_ss(1.0), 1)
-            } else {
-                _mm_add_ps(self.p2, _mm_set_ss(1.0))
-            };
-            Plane::from(crate::arch::sw02(p.p0.into(), blend.into()))
-        }
+        Plane::from(crate::arch::sw02(p.p0, self.p2.blend1(f32x4::set_scalar(1.0))))
     }
 
     /// Conjugates a line $`\ell`$ with this translator and returns the result
     /// $`t\ell\widetilde{t}`$.
     pub fn conj_line(&self, l: Line) -> Line {
-        unsafe { Line::from(crate::arch::sw_l2(l.p1, l.p2, self.p2)) }
+        unsafe { Line::from(crate::arch::sw_l2(l.p1.into(), l.p2.into(), self.p2.0)) }
     }
 
     /// Conjugates a point $p$ with this translator and returns the result
     /// $`tp\widetilde{t}`$.
     pub fn conj_point(&self, p: Point) -> Point {
-        Point::from(crate::arch::sw32(p.p3.into(), self.p2.into()).0)
+        Point::from(crate::arch::sw32(p.p3, self.p2).0)
     }
 }

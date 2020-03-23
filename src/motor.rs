@@ -1,10 +1,9 @@
 use crate::{arch::f32x4, Plane, Point, Rotor, Translator};
-use core::arch::x86_64::*;
 
 #[derive(Clone, Copy)]
 pub struct Motor {
-    pub(crate) p1: __m128,
-    pub(crate) p2: __m128,
+    pub(crate) p1: f32x4,
+    pub(crate) p2: f32x4,
 }
 
 impl Motor {
@@ -16,11 +15,12 @@ impl Motor {
     /// h\mathbf{e}_{0123}$.
     pub fn new(a: f32, b: f32, c: f32, d: f32, e: f32, f: f32, g: f32, h: f32) -> Self {
         Self {
-            p1: unsafe { _mm_set_ps(d, c, b, a) },
-            p2: unsafe { _mm_set_ps(g, f, e, h) },
+            p1: f32x4::new(d, c, b, a),
+            p2: f32x4::new(g, f, e, h),
         }
     }
 
+    /*
     pub fn store1(self) -> [f32; 4] {
         unsafe {
             let mut out = [0.0; 4];
@@ -36,6 +36,7 @@ impl Motor {
             out
         }
     }
+    */
 
     /*
     /// Produce a screw motion rotating and translating by given amounts along a
@@ -58,13 +59,13 @@ impl Motor {
     pub fn from_rotor(r: Rotor) -> Self {
         Self {
             p1: r.p1,
-            p2: f32x4::zero().into(),
+            p2: f32x4::zero(),
         }
     }
 
     pub fn from_translator(t: Translator) -> Self {
         Self {
-            p1: f32x4::set_scalar(1.0).into(),
+            p1: f32x4::set_scalar(1.0),
             p2: t.p2,
         }
     }
@@ -83,41 +84,36 @@ impl Motor {
 
     /// Normalizes this motor $m$ such that $m\widetilde{m} = 1$.
     pub fn normalize(&mut self) {
-        unsafe {
-            use crate::arch::{dp_bc, rcp_nr1, rsqrt_nr1};
+        // m = b + c where b is p1 and c is p2
+        //
+        // m * ~m = |b|^2 + 2(b0 c0 - b1 c1 - b2 c2 - b3 c3)e0123
+        //
+        // The square root is given as:
+        // |b| + (b0 c0 - b1 c1 - b2 c2 - b3 c3)/|b| e0123
+        //
+        // The inverse of this is given by:
+        // 1/|b| + (-b0 c0 + b1 c1 + b2 c2 + b3 c3)/|b|^3 e0123 = s + t e0123
+        //
+        // Multiplying our original motor by this inverse will give us a
+        // normalized motor.
+        let b2 = f32x4::dp_bc(self.p1, self.p1);
+        let s = b2.rsqrt_nr1();
+        let bc = f32x4::dp_bc(self.p1 ^ f32x4::set_scalar(-0.0), self.p2);
+        let t = bc * b2.rcp_nr1() * s;
 
-            // m = b + c where b is p1 and c is p2
-            //
-            // m * ~m = |b|^2 + 2(b0 c0 - b1 c1 - b2 c2 - b3 c3)e0123
-            //
-            // The square root is given as:
-            // |b| + (b0 c0 - b1 c1 - b2 c2 - b3 c3)/|b| e0123
-            //
-            // The inverse of this is given by:
-            // 1/|b| + (-b0 c0 + b1 c1 + b2 c2 + b3 c3)/|b|^3 e0123 = s + t e0123
-            //
-            // Multiplying our original motor by this inverse will give us a
-            // normalized motor.
-            let b2 = dp_bc(self.p1, self.p1);
-            let s = rsqrt_nr1(b2);
-            let bc = dp_bc(_mm_xor_ps(self.p1, _mm_set_ss(-0.0)), self.p2);
-            let t = _mm_mul_ps(_mm_mul_ps(bc, rcp_nr1(b2.into()).into()), s);
+        // (s + t e0123) * motor =
+        //
+        // s b0 +
+        // s b1 e23 +
+        // s b2 e31 +
+        // s b3 e12 +
+        // (s c0 + t b0) e0123 +
+        // (s c1 - t b1) e01 +
+        // (s c2 - t b2) e02 +
+        // (s c3 - t b3) e03
 
-            // (s + t e0123) * motor =
-            //
-            // s b0 +
-            // s b1 e23 +
-            // s b2 e31 +
-            // s b3 e12 +
-            // (s c0 + t b0) e0123 +
-            // (s c1 - t b1) e01 +
-            // (s c2 - t b2) e02 +
-            // (s c3 - t b3) e03
-
-            let tmp = _mm_mul_ps(self.p2, s);
-            self.p2 = _mm_sub_ps(tmp, _mm_xor_ps(_mm_mul_ps(self.p1, t), _mm_set_ss(-0.0)));
-            self.p1 = _mm_mul_ps(self.p1, s);
-        }
+        self.p2 = self.p2 * s - ((self.p1 * t) ^ f32x4::set_scalar(-0.0));
+        self.p1 = self.p1 * s;
     }
 
     /// Return a normalized copy of this motor.
@@ -127,30 +123,24 @@ impl Motor {
     }
 
     pub fn invert(&mut self) {
-        unsafe {
-            // s, t computed as in the normalization
-            let b2 = crate::arch::dp_bc(self.p1, self.p1);
-            let s = crate::arch::rsqrt_nr1(b2);
-            let bc = crate::arch::dp_bc(_mm_xor_ps(self.p1, _mm_set_ss(-0.0)), self.p2);
-            let b2_inv = crate::arch::rcp_nr1(b2.into()).0;
-            let t = _mm_mul_ps(_mm_mul_ps(bc, b2_inv), s);
-            let neg = _mm_set_ps(-0.0, -0.0, -0.0, 0.0);
+        // s, t computed as in the normalization
+        let b2 = f32x4::dp_bc(self.p1, self.p1);
+        let s = b2.rsqrt_nr1();
+        let bc = f32x4::dp_bc(self.p1 ^ f32x4::set_scalar(-0.0), self.p2);
+        let b2_inv = b2.rcp_nr1();
+        let t = bc * b2_inv * s;
+        let neg = f32x4::new(-0.0, -0.0, -0.0, 0.0);
 
-            // p1 * (s + t e0123)^2 = (s * p1 - t p1_perp) * (s + t e0123)
-            // = s^2 p1 - s t p1_perp - s t p1_perp
-            // = s^2 p1 - 2 s t p1_perp
-            // (the scalar component above needs to be negated)
-            // p2 * (s + t e0123)^2 = s^2 p2 NOTE: s^2 = b2_inv
-            let st = _mm_mul_ps(s, t);
-            let st = _mm_mul_ps(self.p1, st);
-            self.p2 = _mm_sub_ps(
-                _mm_mul_ps(self.p2, b2_inv),
-                _mm_xor_ps(_mm_add_ps(st, st), _mm_set_ss(-0.0)),
-            );
-            self.p2 = _mm_xor_ps(self.p2, neg);
+        // p1 * (s + t e0123)^2 = (s * p1 - t p1_perp) * (s + t e0123)
+        // = s^2 p1 - s t p1_perp - s t p1_perp
+        // = s^2 p1 - 2 s t p1_perp
+        // (the scalar component above needs to be negated)
+        // p2 * (s + t e0123)^2 = s^2 p2 NOTE: s^2 = b2_inv
+        let st = self.p1 * s * t;
+        self.p2 = (self.p2 * b2_inv) - ((st + st) ^ f32x4::set_scalar(-0.0));
+        self.p2 = self.p2 ^ neg;
 
-            self.p1 = _mm_xor_ps(_mm_mul_ps(self.p1, b2_inv), neg);
-        }
+        self.p1 = (self.p1 * b2_inv) ^ neg;
     }
 
     pub fn inverse(mut self) -> Self {
@@ -160,11 +150,9 @@ impl Motor {
 
     /// Constrains the motor to traverse the shortest arc
     pub fn constrain(&mut self) {
-        unsafe {
-            let mask = swizzle!(_mm_and_ps(self.p1, _mm_set_ss(-0.0)), 0, 0, 0, 0);
-            self.p1 = _mm_xor_ps(mask, self.p1);
-            self.p2 = _mm_xor_ps(mask, self.p2);
-        }
+        let mask = shuffle!(self.p1 & f32x4::set_scalar(-0.0), [0, 0, 0, 0]);
+        self.p1 = mask ^ self.p1;
+        self.p2 = mask ^ self.p2;
     }
 
     pub fn constrained(mut self) -> Self {
@@ -173,11 +161,9 @@ impl Motor {
     }
 
     pub fn reverse(&mut self) {
-        unsafe {
-            let flip = _mm_set_ps(-0.0, -0.0, -0.0, 0.0);
-            self.p1 = _mm_xor_ps(self.p1, flip);
-            self.p2 = _mm_xor_ps(self.p2, flip);
-        }
+        let flip = f32x4::new(-0.0, -0.0, -0.0, 0.0);
+        self.p1 = self.p1 ^ flip;
+        self.p2 = self.p2 ^ flip;
     }
 
     pub fn reversed(mut self) -> Self {
@@ -186,24 +172,12 @@ impl Motor {
     }
 
     /// Bitwise comparison
-    pub fn motor_eq(&self, other: &Self) -> bool {
-        unsafe {
-            let p1_eq = _mm_cmpeq_ps(self.p1, other.p1);
-            let p2_eq = _mm_cmpeq_ps(self.p2, other.p2);
-            let eq = _mm_and_ps(p1_eq, p2_eq);
-            _mm_movemask_ps(eq) == 0xf
-        }
+    pub fn motor_eq(self, other: Self) -> bool {
+        f32x4::bit_eq_pair(self.into(), other.into())
     }
 
-    pub fn approx_eq(&self, other: &Self, epsilon: f32) -> bool {
-        unsafe {
-            let eps = _mm_set1_ps(epsilon);
-            let neg = _mm_set1_ps(-0.0);
-            let cmp1 = _mm_cmplt_ps(_mm_andnot_ps(neg, _mm_sub_ps(self.p1, other.p1)), eps);
-            let cmp2 = _mm_cmplt_ps(_mm_andnot_ps(neg, _mm_sub_ps(self.p2, other.p2)), eps);
-            let cmp = _mm_and_ps(cmp1, cmp2);
-            _mm_movemask_ps(cmp) == 0xf
-        }
+    pub fn approx_eq(self, other: Self, epsilon: f32) -> bool {
+        f32x4::approx_eq_pair(self.into(), other.into(), epsilon)
     }
 
     /*
@@ -235,7 +209,7 @@ impl Motor {
         unsafe {
             use core::iter::once;
             let mut out: Plane = core::mem::uninitialized();
-            crate::arch::sw012(once(&p.p0), self.p1, Some(&self.p2), once(&mut out.p0));
+            crate::arch::sw012(once(&p.p0), self.p1.0, Some(&self.p2), once(&mut out.p0));
             out
         }
     }
@@ -291,7 +265,12 @@ impl Motor {
         unsafe {
             use core::iter::once;
             let mut out: Point = core::mem::uninitialized();
-            crate::arch::sw312(once(&p.p3), self.p1, Some(&self.p2), once(&mut out.p3));
+            crate::arch::sw312(
+                once(&p.p3.0),
+                self.p1.0,
+                Some(&self.p2.0),
+                once(&mut out.p3.0),
+            );
             out
         }
     }

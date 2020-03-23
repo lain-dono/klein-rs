@@ -1,5 +1,4 @@
 use crate::arch::f32x4;
-use core::arch::x86_64::*;
 
 /// The origin is a convenience type that occupies no memory but is castable to
 /// a point entity. Several operations like conjugation of the origin by a motor
@@ -14,14 +13,14 @@ impl Default for Origin {
     #[inline]
     fn default() -> Self {
         Self(Point {
-            p3: unsafe { _mm_set_ss(1.0) },
+            p3: f32x4::set_scalar(1.0),
         })
     }
 }
 
 #[derive(Clone, Copy)]
 pub struct Point {
-    pub(crate) p3: __m128,
+    pub(crate) p3: f32x4,
 }
 
 impl Point {
@@ -46,17 +45,12 @@ impl Point {
     /// homogeneous coordinate `w` to be supplied as well in the lowest
     /// address pointed to by `data`.
     pub fn load(&mut self, data: [f32; 4]) {
-        unsafe {
-            self.p3 = _mm_loadu_ps(data.as_ptr());
-        }
+        self.p3 = f32x4::from_array(data);
     }
 
     /// Normalize this point (division is done via rcpps with an additional Newton-Raphson refinement).
     pub fn normalize(&mut self) {
-        unsafe {
-            let tmp = crate::arch::rcp_nr1(swizzle!(self.p3, 0, 0, 0, 0).into()).0;
-            self.p3 = _mm_mul_ps(self.p3, tmp);
-        }
+        self.p3 = self.p3 * shuffle!(self.p3, [0, 0, 0, 0]).rcp_nr1();
     }
 
     /// Return a normalized copy of this point.
@@ -66,11 +60,9 @@ impl Point {
     }
 
     pub fn invert(&mut self) {
-        unsafe {
-            let inv_norm = crate::arch::rcp_nr1(swizzle!(self.p3, 0, 0, 0, 0).into()).0;
-            self.p3 = _mm_mul_ps(inv_norm, self.p3);
-            self.p3 = _mm_mul_ps(inv_norm, self.p3);
-        }
+        let inv_norm = shuffle!(self.p3, [0, 0, 0, 0]).rcp_nr1();
+        self.p3 = inv_norm * self.p3;
+        self.p3 = inv_norm * self.p3;
     }
 
     pub fn inverse(mut self) -> Self {
@@ -79,7 +71,7 @@ impl Point {
     }
 
     pub fn reversed(&mut self) {
-        self.p3 = unsafe { _mm_xor_ps(self.p3, _mm_set1_ps(-0.0)) };
+        self.p3 = self.p3 ^ f32x4::all(-0.0);
     }
 
     pub fn reverse(mut self) -> Self {

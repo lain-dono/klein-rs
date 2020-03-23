@@ -471,10 +471,10 @@ pub unsafe fn sw_mm2<'a>(
 //template <bool Variadic = false, bool Translate = true>
 #[inline(always)]
 pub unsafe fn sw012<'a>(
-    a: impl Iterator<Item = &'a __m128>,
+    a: impl Iterator<Item = &'a f32x4>,
     b: __m128,
     c: Option<&__m128>,
-    out: impl Iterator<Item = &'a mut __m128>,
+    out: impl Iterator<Item = &'a mut f32x4>,
 ) {
     // LSB
     //
@@ -562,13 +562,13 @@ pub unsafe fn sw012<'a>(
 
     for (a, p) in a.zip(out) {
         // Compute the lower block for components e1, e2, and e3
-        *p = _mm_mul_ps(tmp1, swizzle!(*a, 1, 3, 2, 0));
-        *p = _mm_add_ps(*p, _mm_mul_ps(tmp2, swizzle!(*a, 2, 1, 3, 0)));
-        *p = _mm_add_ps(*p, _mm_mul_ps(tmp3, *a));
+        p.0 = _mm_mul_ps(tmp1, swizzle!(a.0, 1, 3, 2, 0));
+        p.0 = _mm_add_ps(p.0, _mm_mul_ps(tmp2, swizzle!(*a, 2, 1, 3, 0)));
+        p.0 = _mm_add_ps(p.0, _mm_mul_ps(tmp3, a.0));
 
         if translate {
-            let tmp5 = hi_dp(tmp4, *a);
-            *p = _mm_add_ps(*p, tmp5);
+            let tmp5 = hi_dp(tmp4, a.0);
+            p.0 = _mm_add_ps(p.0, tmp5);
         }
     }
 }

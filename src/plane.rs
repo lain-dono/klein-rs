@@ -10,11 +10,10 @@
 //! $d + ax + by + cz = 0$.
 
 use super::{arch::f32x4, Line, Point};
-use core::arch::x86_64::*;
 
 #[derive(Clone, Copy)]
 pub struct Plane {
-    pub(crate) p0: __m128,
+    pub(crate) p0: f32x4,
 }
 
 impl Plane {
@@ -32,7 +31,7 @@ impl Plane {
     /// This is a faster mechanism for setting data compared to setting
     /// components one at a time.
     pub fn load(&mut self, data: [f32; 4]) {
-        self.p0 = f32x4::from_array(data).into();
+        self.p0 = f32x4::from_array(data);
     }
 
     /// Normalize this plane `p` such that $p \cdot p = 1$.
@@ -42,12 +41,11 @@ impl Plane {
     /// normalized rotor between two planes with the geometric product `*` also
     /// requires that the planes are normalized.
     pub fn normalize(&mut self) {
-        let p0 = f32x4::from(self.p0);
-        let inv_norm = f32x4::hi_dp_bc(p0, p0)
+        let inv_norm = f32x4::hi_dp_bc(self.p0, self.p0)
             .rsqrt_nr1()
             .blend1(f32x4::set_scalar(1.0));
 
-        self.p0 = (inv_norm * p0).into();
+        self.p0 = inv_norm * self.p0;
     }
 
     /// Return a normalized copy of this plane.
@@ -63,14 +61,12 @@ impl Plane {
     /// $P\vee\ell$ containing both $\ell$ and $P$ will have a norm equivalent
     /// to the distance between $P$ and $\ell$.
     pub fn norm(self) -> f32 {
-        let p0 = f32x4::from(self.p0);
-        f32x4::hi_dp(p0, p0).sqrt_nr1().first()
+        f32x4::hi_dp(self.p0, self.p0).sqrt_nr1().first()
     }
 
     pub fn invert(&mut self) {
-        let p0 = f32x4::from(self.p0);
-        let inv_norm = f32x4::hi_dp_bc(p0, p0).rsqrt_nr1();
-        self.p0 = (p0 * inv_norm * inv_norm).into();
+        let inv_norm = f32x4::hi_dp_bc(self.p0, self.p0).rsqrt_nr1();
+        self.p0 = self.p0 * inv_norm * inv_norm;
     }
 
     pub fn inverse(mut self) -> Self {
@@ -79,34 +75,26 @@ impl Plane {
     }
 
     pub fn plane_eq(self, other: Self) -> bool {
-        unsafe { _mm_movemask_ps(_mm_cmpeq_ps(self.p0, other.p0)) == 0b1111 }
+        f32x4::bit_eq(self.into(), other.into())
     }
 
     pub fn approx_eq(self, other: Self, epsilon: f32) -> bool {
-        unsafe {
-            let eps = _mm_set1_ps(epsilon);
-            let cmp = _mm_cmplt_ps(
-                _mm_andnot_ps(_mm_set1_ps(-0.0), _mm_sub_ps(self.p0, other.p0)),
-                eps,
-            );
-            _mm_movemask_ps(cmp) != 0b1111
-        }
+        f32x4::approx_eq(self.into(), other.into(), epsilon)
     }
 
     /// Reflect another plane $p_2$ through this plane $p_1$. The operation
     /// performed via this call operator is an optimized routine equivalent to
     /// the expression $p_1 p_2 p_1$.
     pub fn reflect_plane(self, p: Self) -> Self {
-        Plane::from(crate::arch::sw00(self.p0.into(), p.p0.into()).0)
+        Plane::from(crate::arch::sw00(self.p0, p.p0))
     }
 
     /// Reflect line $\ell$ through this plane $p$. The operation
     /// performed via this call operator is an optimized routine equivalent to
     /// the expression $p \ell p$.
     pub fn reflect_line(self, line: Line) -> Line {
-        let (p0, p1) = (self.p0.into(), line.p1.into());
-        let (p1, p2) = crate::arch::sw10(p0, p1);
-        let p2 = p2 + crate::arch::sw20(p0, line.p2.into());
+        let (p1, p2) = crate::arch::sw10(self.p0, line.p1);
+        let p2 = p2 + crate::arch::sw20(self.p0, line.p2);
 
         Line::from((p1, p2))
     }
@@ -115,6 +103,6 @@ impl Plane {
     /// performed via this call operator is an optimized routine equivalent to
     /// the expression $p P p$.
     pub fn reflect_point(self, p: Point) -> Point {
-        Point::from(crate::arch::sw30(self.p0.into(), p.p3.into()))
+        Point::from(crate::arch::sw30(self.p0, p.p3))
     }
 }

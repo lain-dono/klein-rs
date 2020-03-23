@@ -459,13 +459,13 @@ mod multivector_ip; // f32x4
 
 mod direction; // done f32x4
 mod dual; // done scalar
-mod line; // done
+mod line; // _done f32x4
 mod matrix;
 mod motor;
 mod plane; // done
 mod point; // done
 mod rotor;
-mod translator; // done
+mod translator; // done f32x4
 
 mod macros;
 

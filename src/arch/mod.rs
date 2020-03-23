@@ -200,6 +200,27 @@ impl f32x4 {
 }
 
 impl f32x4 {
+    fn cmpeq_ps(a: Self, b: Self) -> Self {
+        Self(unsafe { _mm_cmpeq_ps(a.0, b.0) })
+    }
+
+    fn cmplt_ps(a: Self, b: Self) -> Self {
+        Self(unsafe { _mm_cmplt_ps(a.0, b.0) })
+    }
+
+    fn andnot(self, other: Self) -> Self {
+        Self(unsafe { _mm_andnot_ps(self.0, other.0) })
+    }
+
+    pub fn bit_eq_pair(a: (Self, Self), b: (Self, Self)) -> bool {
+        unsafe {
+            let eq0 = Self::cmpeq_ps(a.0, b.0);
+            let eq1 = Self::cmpeq_ps(a.1, b.1);
+            let eq = eq0 & eq1;
+            _mm_movemask_ps(eq.0) == 0x0F
+        }
+    }
+
     pub fn bit_eq(self, other: Self) -> bool {
         unsafe { _mm_movemask_ps(_mm_cmpeq_ps(self.0, other.0)) == 0b1111 }
     }
@@ -212,6 +233,17 @@ impl f32x4 {
                 eps,
             );
             _mm_movemask_ps(cmp) != 0b1111
+        }
+    }
+
+    pub fn approx_eq_pair(a: (Self, Self), b: (Self, Self), epsilon: f32) -> bool {
+        unsafe {
+            let eps = Self::all(epsilon);
+            let neg = Self::all(-0.0);
+            let cmp1 = Self::cmplt_ps(neg.andnot(a.0 - b.0), eps);
+            let cmp2 = Self::cmplt_ps(neg.andnot(a.1 - b.1), eps);
+            let cmp = cmp1 & cmp2;
+            _mm_movemask_ps(cmp.0) == 0x0F
         }
     }
 }
@@ -240,9 +272,12 @@ impl f32x4 {
         Self::from(unsafe { _mm_movehl_ps(self.0, self.0) })
     }
 
-
     pub fn dp(a: Self, b: Self) -> Self {
         Self(unsafe { dp(a.0, b.0) })
+    }
+
+    pub fn dp_bc(a: Self, b: Self) -> Self {
+        Self(unsafe { dp_bc(a.0, b.0) })
     }
 
     pub fn hi_dp(a: Self, b: Self) -> Self {
@@ -268,7 +303,6 @@ impl f32x4 {
     pub fn unpacklo(self) -> Self {
         Self(unsafe { _mm_unpacklo_ps(self.0, self.0) })
     }
-
 
     pub fn blend1(self, b: Self) -> Self {
         if cfg!(target_feature = "sse4.1") {

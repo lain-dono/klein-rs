@@ -86,10 +86,10 @@ impl_meet!(|a: Line, b: Line| -> Dual {
     Dual { p: 0.0, q: x + y }
 });
 
-impl_meet!(|a: Line, b: IdealLine| -> Dual { Branch { p1: a.p1 } ^ b });
+impl_meet!(|a: Line, b: IdealLine| -> Dual { Branch { p1: a.p1.into() } ^ b });
 impl_meet!(|b: IdealLine, a: Line| -> Dual { a ^ b });
 
-impl_meet!(|a: Line, b: Branch| -> Dual { IdealLine { p2: a.p2 } ^ b });
+impl_meet!(|a: Line, b: Branch| -> Dual { IdealLine { p2: a.p2.into() } ^ b });
 impl_meet!(|b: Branch, a: Line| -> Dual { a ^ b });
 
 // Partition memory layouts

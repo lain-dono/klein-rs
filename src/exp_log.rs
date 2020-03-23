@@ -7,7 +7,7 @@ impl Line {
     /// or accelerate the motor's action. The line need not be a _simple bivector_
     /// for the operation to be well-defined.
     pub fn exp(self) -> Motor {
-        Motor::from(crate::arch::exp(self.p1.into(), self.p2.into()))
+        Motor::from(crate::arch::exp(self.p1, self.p2))
     }
 }
 
@@ -45,20 +45,20 @@ impl Branch {
     /// Exponentiate a branch to produce a rotor.
     #[inline]
     pub fn exp(self) -> Rotor {
-        let p1 = f32x4::from(self.p1);
+        let p1 = self.p1;
 
         // Compute the rotor angle
         let ang = f32x4::hi_dp(p1, p1).sqrt_nr1().first();
         let (sin, cos) = ang.sin_cos();
 
         let p1 = f32x4::all(sin / ang) * p1 + f32x4::set_scalar(cos);
-        Rotor { p1: p1.into() }
+        Rotor { p1 }
     }
 
     #[inline]
     pub fn sqrt(self) -> Rotor {
-        let p1 = f32x4::from(self.p1).add_scalar(f32x4::set_scalar(1.0));
-        Rotor { p1: p1.into() }.normalized()
+        let p1 = self.p1.add_scalar(f32x4::set_scalar(1.0));
+        Rotor { p1 }.normalized()
     }
 }
 
@@ -74,7 +74,7 @@ impl Rotor {
     /// rotor is normalized such that $a^2 + b^2 + c^2 = 1$.
     #[inline]
     pub fn log(self) -> Branch {
-        let p1 = f32x4::from(self.p1);
+        let p1 = self.p1;
         let ang = p1.first().acos();
         let sin = f32x4::all(ang.sin());
 
@@ -85,28 +85,26 @@ impl Rotor {
         } else {
             p1 & f32x4::cast_i32(-1, -1, -1, 0)
         };
-        Branch { p1: p1.into() }
+        Branch { p1 }
     }
 
     /// Compute the square root of the provided rotor.
     #[inline]
     pub fn sqrt(self) -> Self {
-        Self::from(f32x4::from(self.p1).add_scalar(f32x4::set_scalar(1.0))).normalized()
+        Self::from(self.p1.add_scalar(f32x4::set_scalar(1.0))).normalized()
     }
 }
 
 impl Motor {
     #[inline]
     pub fn log(self) -> Line {
-        Line::from(crate::arch::log(self.p1.into(), self.p2.into()))
+        Line::from(crate::arch::log(self.p1, self.p2))
     }
 
     /// Compute the square root of the provided motor.
     #[inline]
     pub fn sqrt(mut self) -> Self {
-        self.p1 = f32x4::from(self.p1)
-            .add_scalar(f32x4::set_scalar(1.0))
-            .into();
+        self.p1 = self.p1.add_scalar(f32x4::set_scalar(1.0));
         self.normalized()
     }
 }
