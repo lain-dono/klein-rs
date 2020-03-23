@@ -1,12 +1,3 @@
-//! # Lines
-//!
-//! Klein provides three line classes: `line`, `branch`, and `ideal_line`. The
-//! line class represents a full six-coordinate bivector. The branch contains
-//! three non-degenerate components (aka, a line through the origin). The ideal
-//! line represents the line at infinity. When the line is created as a meet
-//! of two planes or join of two points (or carefully selected Plücker
-//! coordinates), it will be a Euclidean line (factorizable as the meet of two vectors).
-
 use core::arch::x86_64::*;
 
 /// An ideal line represents a line at infinity and corresponds to the

@@ -1,29 +1,3 @@
-//! exp_log Exponential and Logarithm
-//!
-//! The group of rotations, translations, and screws (combined rotatation and
-//! translation) is _nonlinear_. This means, given say, a rotor $\mathbf{r}$,
-//! the rotor
-//! $\frac{\mathbf{r}}{2}$ _does not_ correspond to half the rotation.
-//! Similarly, for a motor $\mathbf{m}$, the motor $n \mathbf{m}$ is not $n$
-//! applications of the motor $\mathbf{m}$. One way we could achieve this is
-//! through exponentiation; for example, the motor $\mathbf{m}^3$ will perform
-//! the screw action of $\mathbf{m}$ three times. However, repeated
-//! multiplication in this fashion lacks both efficiency and numerical
-//! stability.
-//!
-//! The solution is to take the logarithm of the action which maps the action to
-//! a linear space. Using `log(A)` where `A` is one of `rotor`,
-//! `translator`, or `motor`, we can apply linear scaling to `log(A)`,
-//! and then re-exponentiate the result. Using this technique, `exp(n * log(A))`
-//! is equivalent to $\mathbf{A}^n$.
-
-//! Takes the principal branch of the logarithm of the motor, returning a
-//! bivector. Exponentiation of that bivector without any changes produces
-//! this motor again. Scaling that bivector by $\frac{1}{n}$,
-//! re-exponentiating, and taking the result to the $n$th power will also
-//! produce this motor again. The logarithm presumes that the motor is
-//! normalized.
-
 use crate::{arch::f32x4, Branch, IdealLine, Line, Motor, Rotor, Translator};
 
 impl Line {
@@ -57,10 +31,10 @@ impl IdealLine {
     /// Exponentiate an ideal line to produce a translation.
     ///
     /// The exponential of an ideal line
-    /// $a \mathbf{e}_{01} + b\mathbf{e}_{02} + c\mathbf{e}_{03}$ is given as:
+    /// $`a \mathbf{e}_{01} + b\mathbf{e}_{02} + c\mathbf{e}_{03}`$ is given as:
     ///
-    /// $$\exp{\left[a\ee_{01} + b\ee_{02} + c\ee_{03}\right]} = 1 +\
-    /// a\ee_{01} + b\ee_{02} + c\ee_{03}$$
+    /// $`\exp{\left[a\ee_{01} + b\ee_{02} + c\ee_{03}\right]} = 1 +\
+    /// a\ee_{01} + b\ee_{02} + c\ee_{03}`$
     #[inline]
     pub fn exp(self) -> Translator {
         Translator { p2: self.p2 }

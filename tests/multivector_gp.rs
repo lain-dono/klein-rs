@@ -71,6 +71,7 @@ fn line_normalization() {
     abs_diff_eq!(m.e0123(), 0.0);
 }
 
+#[test]
 fn branch_branch() {
     /*
     let b1 = Branch::new (2.0, 1.0, 3.0);
@@ -102,10 +103,10 @@ fn branch_branch() {
 #[test]
 fn line_mul_line() {
     // a*e01 + b*e02 + c*e03 + d*e23 + e*e31 + f*e12
-    let l1 = line (1.0, 0.0, 0.0, 3.0, 2.0, 1.0);
-    let l2 = line (0.0, 1.0, 0.0, 4.0, 1.0, -2.0);
+    let l1 = Line::new(1.0, 0.0, 0.0, 3.0, 2.0, 1.0);
+    let l2 = Line::new(0.0, 1.0, 0.0, 4.0, 1.0, -2.0);
 
-    let l1l2: Motor  = l1 * l2;
+    let l1l2: Motor = l1 * l2;
     assert_eq!(l1l2.scalar(), -12.0);
     assert_eq!(l1l2.e12(), 5.0);
     assert_eq!(l1l2.e31(), -10.0);

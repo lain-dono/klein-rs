@@ -1,4 +1,5 @@
 use klein::{IdealLine, Line, Plane, Point};
+use approx::abs_diff_eq;
 
 // plane|plane
 #[test]
@@ -151,8 +152,8 @@ fn project_point_to_line() {
     let mut p4: Point = (l | p1) ^ l;
     p4.normalize();
 
-    approx::abs_diff_eq!(p4.e123(), 1.0);
-    approx::abs_diff_eq!(p4.x(), 2.0);
-    approx::abs_diff_eq!(p4.y(), 0.0);
-    approx::abs_diff_eq!(p4.z(), 0.0);
+    abs_diff_eq!(p4.e123(), 1.0);
+    abs_diff_eq!(p4.x(), 2.0);
+    abs_diff_eq!(p4.y(), 0.0);
+    abs_diff_eq!(p4.z(), 0.0);
 }

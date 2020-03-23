@@ -1,47 +1,4 @@
-//! # Rotors
-//!
-//! The rotor is an entity that represents a rigid rotation about an axis.
-//! To apply the rotor to a supported entity, the call operator is available.
-//!
-//! # example
-//!
-//! ```c++
-//!     // Initialize a point at (1, 3, 2)
-//!     kln::point p{1.f, 3.f, 2.f};
-//!
-//!     // Create a normalized rotor representing a pi/2 radian
-//!     // rotation about the xz-axis.
-//!     kln::rotor r{M_PI * 0.5f, 1.f, 0.f, 1.f};
-//!
-//!     // Rotate our point using the created rotor
-//!     kln::point rotated = r(p);
-//! ```
-//! We can rotate lines and planes as well using the rotor's call operator.
-//!
-//! Rotors can be multiplied to one another with the `*` operator to create
-//! a new rotor equivalent to the application of each factor.
-//!
-//! # example
-//!
-//! ```c++
-//!     // Create a normalized rotor representing a $\frac{\pi}{2}$ radian
-//!     // rotation about the xz-axis.
-//!     kln::rotor r1{M_PI * 0.5f, 1.f, 0.f, 1.f};
-//!
-//!     // Create a second rotor representing a $\frac{\pi}{3}$ radian
-//!     // rotation about the yz-axis.
-//!     kln::rotor r2{M_PI / 3.f, 0.f, 1.f, 1.f};
-//!
-//!     // Use the geometric product to create a rotor equivalent to first
-//!     // applying r1, then applying r2. Note that the order of the
-//!     // operands here is significant.
-//!     kln::rotor r3 = r2 * r1;
-//! ```
-//!
-//! The same `*` operator can be used to compose the rotor's action with other
-//! translators and motors.
-
-use crate::{Direction, Point, Plane, arch::f32x4};
+use crate::{arch::f32x4, Direction, Plane, Point};
 use core::arch::x86_64::*;
 
 #[derive(Clone, Copy)]
@@ -96,7 +53,7 @@ impl Rotor {
     pub fn normalize(&mut self) {
         unsafe {
             // A rotor is normalized if r * ~r is unity.
-            use crate::arch::{rsqrt_nr1, dp_bc};
+            use crate::arch::{dp_bc, rsqrt_nr1};
             let inv_norm = rsqrt_nr1(dp_bc(self.p1, self.p1));
             self.p1 = _mm_mul_ps(self.p1, inv_norm);
         }
@@ -246,7 +203,7 @@ impl Rotor {
 
     /// Conjugates a point `p` with this rotor and returns the result
     /// $rp\widetilde{r}$.
-    pub fn conj_point(&self, p: &Point) -> Point {
+    pub fn conj_point(&self, p: Point) -> Point {
         // NOTE: Conjugation of a plane and point with a rotor is identical
         unsafe {
             use core::iter::once;

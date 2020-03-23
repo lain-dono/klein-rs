@@ -1,39 +1,9 @@
-//! # Exterior Product (ext/meet)
-//!
-//! The exterior product between two basis elements extinguishes if the two
-//! operands share any common index. Otherwise, the element produced is
-//! equivalent to the union of the subspaces. A sign flip is introduced if
-//! the concatenation of the element indices is an odd permutation of the
-//! cyclic basis representation. The exterior product extends to general
-//! multivectors by linearity.
-//!
-//! # example "Meeting two planes"
-//!
-//! ```cpp
-//!     kln::plane p1{x1, y1, z1, d1};
-//!     kln::plane p2{x2, y2, z2, d2};
-//!
-//!     // l lies at the intersection of p1 and p2.
-//!     kln::line l = p1 ^ p2;
-//! ```
-//!
-//! # example "Meeting a line and a plane"
-//!
-//! ```cpp
-//!     kln::plane p1{x, y, z, d};
-//!     kln::line l2{mx, my, mz, dx, dy, dz};
-//!
-//!     // p2 lies at the intersection of p1 and l2.
-//!     kln::point p2 = p1 ^ l2;
-//! ```
-
 use crate::{arch::f32x4, Branch, Dual, IdealLine, Line, Plane, Point};
 
 macro_rules! impl_meet {
     (|$a:ident: $a_ty:ty, $b:ident: $b_ty:ty| -> $output:ty $body:block) => {
         impl std::ops::BitXor<$b_ty> for $a_ty {
             type Output = $output;
-
             #[inline]
             fn bitxor(self, other: $b_ty) -> Self::Output {
                 let $a = self;

@@ -1,7 +1,9 @@
+use approx::abs_diff_eq;
 use klein::{
     arch::{f32x4, sw02},
-    Line, Plane, Point,
+    Line, Plane, Point, Rotor,
 };
+use std::f32::consts::FRAC_PI_2;
 
 #[test]
 fn simd_sandwich() {
@@ -68,17 +70,19 @@ fn rotor_line() {
     assert_eq!(l2.e31(), 102.0);
     assert_eq!(l2.e23(), -36.0);
 }
+*/
 
-TEST_CASE("rotor-point")
-{
-    rotor r{M_PI * 0.5f, 0, 0, 1.0};
-    point p1{1, 0, 0};
-    point p2 = r(p1);
+#[test]
+fn rotor_point() {
+    let r = Rotor::new(FRAC_PI_2, 0.0, 0.0, 1.0);
+    let p1 = Point::new(1.0, 0.0, 0.0);
+    let p2: Point = r.conj_point(p1);
     assert_eq!(p2.x(), 0.0);
-    assert_eq!(p2.y(), doctest::Approx(1.0));
+    abs_diff_eq!(p2.y(), 1.0);
     assert_eq!(p2.z(), 0.0);
 }
 
+/*
 TEST_CASE("translator-point")
 {
     translator t{1.0, 0.0, 0.0, 1.0};

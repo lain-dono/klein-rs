@@ -1,61 +1,3 @@
-//! # Motors
-//!
-//! A `motor` represents a kinematic motion in our algebra. From
-//! [Chasles'
-//! theorem](https://en.wikipedia.org/wiki/Chasles%27_theorem_(kinematics)), we
-//! know that any rigid body displacement can be produced by a translation along
-//! a line, followed or preceded by a rotation about an axis parallel to that
-//! line. The motor algebra is isomorphic to the dual quaternions but exists
-//! here in the same algebra as all the other geometric entities and actions at
-//! our disposal. Operations such as composing a motor with a rotor or
-//! translator are possible for example. The primary benefit to using a motor
-//! over its corresponding matrix operation is twofold. First, you get the
-//! benefit of numerical stability when composing multiple actions via the
-//! geometric product (`*`). Second, because the motors constitute a continuous
-//! group, they are amenable to smooth interpolation and differentiation.
-//!
-//! # example
-//!
-//! ```c++
-//!     // Create a rotor representing a pi/2 rotation about the z-axis
-//!     // Normalization is done automatically
-//!     rotor r{M_PI * 0.5f, 0.0, 0.0, 1.0};
-//!
-//!     // Create a translator that represents a translation of 1 unit
-//!     // in the yz-direction. Normalization is done automatically.
-//!     translator t{1.0, 0.0, 1.0, 1.0};
-//!
-//!     // Create a motor that combines the action of the rotation and
-//!     // translation above.
-//!     motor m = r * t;
-//!
-//!     // Initialize a point at (1, 3, 2)
-//!     kln::point p1{1.0, 3.0, 2.0};
-//!
-//!     // Translate p1 and rotate it to create a new point p2
-//!     kln::point p2 = m(p1);
-//! ```
-//!
-//! Motors can be multiplied to one another with the `*` operator to create
-//! a new motor equivalent to the application of each factor.
-//!
-//! # example
-//!
-//! ```c++
-//!     // Suppose we have 3 motors m1, m2, and m3
-//!
-//!     // The motor m created here represents the combined action of m1,
-//!     // m2, and m3.
-//!     kln::motor m = m3 * m2 * m1;
-//! ```
-//!
-//! The same `*` operator can be used to compose the motor's action with other
-//! translators and rotors.
-//!
-//! A demonstration of using the exponential and logarithmic map to blend
-//! between two motors is provided in a test case
-//! [here](https://github.com/jeremyong/Klein/blob/master/test/test_exp_log.cpp#L48).
-
 use crate::{arch::f32x4, Plane, Point, Rotor, Translator};
 use core::arch::x86_64::*;
 
@@ -273,6 +215,7 @@ impl Motor {
     {
         mat3x4 out;
         mat4x4_12<true, true>(p1_, &p2_, out.cols);
+
         return out;
     }
 
@@ -326,29 +269,34 @@ impl Motor {
     */
 
     /*
-        /// Conjugates an array of lines with this motor in the input array and
-        /// stores the result in the output array. Aliasing is only permitted when
-        /// `in == out` (in place motor application).
-        ///
-        /// !!! tip
-        ///
-        ///     When applying a motor to a list of tightly packed lines, this
-        ///     routine will be *significantly faster* than applying the motor to
-        ///     each line individually.
-        void KLN_VEC_CALL operator()(line* in, line* out, size_t count) const noexcept
-        {
-            detail::swMM<true, true, true>(&in->p1_, p1_, &p2_, &out->p1_, count);
-        }
+    /// Conjugates an array of lines with this motor in the input array and
+    /// stores the result in the output array. Aliasing is only permitted when
+    /// `in == out` (in place motor application).
+    ///
+    /// !!! tip
+    ///
+    ///     When applying a motor to a list of tightly packed lines, this
+    ///     routine will be *significantly faster* than applying the motor to
+    ///     each line individually.
+    void KLN_VEC_CALL operator()(line* in, line* out, size_t count) const noexcept
+    {
+        detail::swMM<true, true, true>(&in->p1_, p1_, &p2_, &out->p1_, count);
+    }
+    */
 
-        /// Conjugates a point $p$ with this motor and returns the result
-        /// $mp\widetilde{m}$.
-        [[nodiscard]] point KLN_VEC_CALL operator()(point const& p) const noexcept
-        {
-            point out;
-            detail::sw312<false, true>(&p.p3_, p1_, &p2_, &out.p3_);
-            return out;
+    /// Conjugates a point $p$ with this motor and returns the result
+    /// $mp\widetilde{m}$.
+    #[inline]
+    pub fn conj_point(self, p: Point) -> Point {
+        unsafe {
+            use core::iter::once;
+            let mut out: Point = core::mem::uninitialized();
+            crate::arch::sw312(once(&p.p3), self.p1, Some(&self.p2), once(&mut out.p3));
+            out
         }
+    }
 
+    /*
         /// Conjugates an array of points with this motor in the input array and
         /// stores the result in the output array. Aliasing is only permitted when
         /// `in == out` (in place motor application).

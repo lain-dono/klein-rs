@@ -1,13 +1,3 @@
-//! # Points
-//!
-//! A point is represented as the multivector
-//! `$x\mathbf{e}_{032} + y\mathbf{e}_{013} + z\mathbf{e}_{021} +
-//! \mathbf{e}_{123}$`.
-//!
-//! The point has a trivector representation because it is
-//! the fixed point of 3 planar reflections (each of which is a grade-1 multivector).
-//! In practice, the coordinate mapping can be thought of as an implementation detail.
-
 use crate::arch::f32x4;
 use core::arch::x86_64::*;
 
@@ -17,12 +7,12 @@ use core::arch::x86_64::*;
 #[derive(Clone, Copy)]
 pub struct Origin(pub(crate) Point);
 
-impl Origin {
+impl Default for Origin {
     /// On its own, the origin occupies no memory, but it can be casted as an
     /// entity at any point, at which point it is represented as
-    /// `$\mathbf{e}_{123}$`.
+    /// $`\mathbf{e}_{123}`$.
     #[inline]
-    pub fn new() -> Self {
+    fn default() -> Self {
         Self(Point {
             p3: unsafe { _mm_set_ss(1.0) },
         })

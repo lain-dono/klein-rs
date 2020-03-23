@@ -36,38 +36,38 @@ macro_rules! shuffle {
 
 // DP high components and caller ignores returned high components
 #[inline(always)]
-pub unsafe fn hi_dp_ss(a: __m128, b: __m128) -> __m128 {
+pub fn hi_dp_ss(a: __m128, b: __m128) -> __m128 {
+    let a = f32x4::from(a);
+    let b = f32x4::from(b);
+
     // 0 1 2 3 -> 1 + 2 + 3, 0, 0, 0
-    let out = _mm_mul_ps(a, b);
+    let out = a * b;
 
     // 0 1 2 3 -> 1 1 3 3
-    let hi = _mm_movehdup_ps(out);
+    let hi = out.movehdup();
 
     // 0 1 2 3 + 1 1 3 3 -> (0 + 1, 1 + 1, 2 + 3, 3 + 3)
-    let sum = _mm_add_ps(hi, out);
+    let sum = hi + out;
 
     // unpacklo: 0 0 1 1
-    let out = _mm_add_ps(sum, _mm_unpacklo_ps(out, out));
+    let out = sum + out.unpacklo();
 
     // (1 + 2 + 3, _, _, _)
-    _mm_movehl_ps(out, out)
+    out.movehl().into()
 }
 
 // Reciprocal with an additional single Newton-Raphson refinement
 #[inline(always)]
 pub fn rcp_nr1(a: f32x4) -> f32x4 {
-    unsafe {
-        // f(x) = 1/x - a
-        // f'(x) = -1/x^2
-        // x_{n+1} = x_n - f(x)/f'(x)
-        //         = 2x_n - a x_n^2 = x_n (2 - a x_n)
+    // f(x) = 1/x - a
+    // f'(x) = -1/x^2
+    // x_{n+1} = x_n - f(x)/f'(x)
+    //         = 2x_n - a x_n^2 = x_n (2 - a x_n)
 
-        // ~2.7x baseline with ~22 bits of accuracy
-        let a = a.into();
-        let xn = _mm_rcp_ps(a);
-        let axn = _mm_mul_ps(a, xn);
-        _mm_mul_ps(xn, _mm_sub_ps(_mm_set1_ps(2.0), axn)).into()
-    }
+    // ~2.7x baseline with ~22 bits of accuracy
+    let xn = a.recip();
+    let axn = a * xn;
+    xn * (f32x4::all(2.0) - axn)
 }
 
 // Reciprocal sqrt with an additional single Newton-Raphson refinement.

@@ -1,67 +1,4 @@
-//! Geometric Product (gp)
-//!
-//! The geometric product extends the exterior product with a notion of a
-//! metric. When the subspace intersection of the operands of two basis
-//! elements is non-zero, instead of the product extinguishing, the grade
-//! collapses and a scalar weight is included in the final result according
-//! to the metric. The geometric product can be used to build rotations, and
-//! by extension, rotations and translations in projective space.
-//!
-//! # example "Rotor composition"
-//!
-//! ```cpp
-//!     kln::rotor r1{ang1, x1, y1, z1};
-//!     kln::rotor r2{ang2, x2, y2, z2};
-//!
-//!     // Compose rotors with the geometric product
-//!     kln::rotor r3 = r1 * r2;; // r3 combines r2 and r1 in that order
-//! ```
-//!
-//! # example "Two reflections"
-//!
-//! ```cpp
-//!     kln::plane p1{x1, y1, z1, d1};
-//!     kln::plane p2{x2, y2, z2, d2};
-//!
-//!     // The geometric product of two planes combines their reflections
-//!     kln::motor m3 = p1 * p2; // m3 combines p2 and p1 in that order
-//!     // If p1 and p2 were parallel, m3 would be a translation. Otherwise,
-//!     // m3 would be a rotation.
-//! ```
-//!
-//! Another common usage of the geometric product is to create a transformation
-//! that takes one entity to another. Suppose we have two entities $a$ and $b$
-//! and suppose that both entities are normalized such that $a^2 = b^2 = 1$.
-//! Then, the action created by $\sqrt{ab}$ is the action that maps $b$ to $a$.
-//!
-//! # example "Motor between two lines"
-//!
-//! ```cpp
-//!     kln::line l1{mx1, my1, mz1, dx1, dy1, dz1};
-//!     kln::line l2{mx2, my2, mz2, dx2, dy2, dz2};
-//!     // Ensure lines are normalized if they aren't already
-//!     l1.normalize();
-//!     l2.normalize();
-//!     kln::motor m = kln::sqrt(l1 * l2);
-//!
-//!     kln::line l3 = m(l2);
-//!     // l3 will be projectively equivalent to l1.
-//! ```
-//!
-//! Also provided are division operators that multiply the first argument by the
-//! inverse of the second argument.
-
-/// Construct a motor $m$ such that $\sqrt{m}$ takes plane $b$ to plane $a$.
-///
-/// # example
-///
-/// ```cpp
-///     kln::plane p1{x1, y1, z1, d1};
-///     kln::plane p2{x2, y2, z2, d2};
-///     kln::motor m = sqrt(p1 * p2);
-///     plane p3 = m(p2);
-///     // p3 will be approximately equal to p1
-/// ```
+use crate::{arch::f32x4, Branch, Dual, Line, Motor, Plane, Point, Rotor, Translator};
 
 macro_rules! impl_gp {
     (|$a:ident: $a_ty:ty, $b:ident: $b_ty:ty| -> $output:ty $body:block) => {
@@ -83,14 +20,13 @@ macro_rules! impl_gp {
             type Output = $output;
 
             #[inline]
+            #[allow(clippy::suspicious_arithmetic_impl)]
             fn div(self, other: $b_ty) -> Self::Output {
                 self * other.inverse()
             }
         }
     };
 }
-
-use crate::{arch::f32x4, Branch, Dual, Line, Motor, Plane, Point, Rotor, Translator};
 
 impl_gp!(|a: Plane, b: Plane| -> Motor { Motor::from(gp00(a.p0, b.p0)) });
 impl_gp!(|a: Plane, b: Point| -> Motor { Motor::from(gp03_false(a.p0, b.p3)) });
@@ -104,7 +40,6 @@ impl_gp!(|a: Branch, b: Branch| -> Rotor { Rotor::from(gp11(a.p1, b.p1)) });
 /// provided that $a$ and $b$ are both normalized.
 impl_gp!(|a: Line, b: Line| -> Motor {
     // Optimized line * line operation
-    //pub unsafe fn gp_ll(l1: &[__m128; 2], l2: &[__m128; 2]) -> (__m128, __m128) {
     // (-a1 b1 - a3 b3 - a2 b2) +
     // (a2 b1 - a1 b2) e12 +
     // (a1 b3 - a3 b1) e31 +
@@ -114,44 +49,26 @@ impl_gp!(|a: Line, b: Line| -> Motor {
     // (a1 c3 - a3 c1         + b3 d1 - b1 d3) e02 +
     // (a2 c1 - a1 c2         + b1 d2 - b2 d1) e03 +
 
-    let (a, d) = (&a.p1, &a.p2);
-    let (b, c) = (&b.p1, &b.p2);
+    let (a, d) = (f32x4::from(a.p1), f32x4::from(a.p2));
+    let (b, c) = (f32x4::from(b.p1), f32x4::from(b.p2));
 
-    let flip = _mm_set_ss(-0.0);
+    let a2 = a.unpackhi();
+    let b2 = b.unpackhi();
+    let c2 = c.unpackhi();
+    let d2 = d.unpackhi();
 
-    let p1 = _mm_mul_ps(swizzle!(*a, 3, 1, 2, 1), swizzle!(*b, 2, 3, 1, 1));
-    let p1 = _mm_xor_ps(p1, flip);
-    let p1 = _mm_sub_ps(
-        p1,
-        _mm_mul_ps(swizzle!(*a, 2, 3, 1, 3), swizzle!(*b, 3, 1, 2, 3)),
-    );
-    let a2 = _mm_unpackhi_ps(*a, *a);
-    let b2 = _mm_unpackhi_ps(*b, *b);
-    let p1 = _mm_sub_ss(p1, _mm_mul_ss(a2, b2));
+    let flip = f32x4::set_scalar(-0.0);
 
-    let p2 = _mm_mul_ps(swizzle!(*a, 2, 1, 3, 1), swizzle!(*c, 1, 3, 2, 1));
-    let p2 = _mm_sub_ps(
-        p2,
-        _mm_xor_ps(
-            flip,
-            _mm_mul_ps(swizzle!(*a, 1, 3, 2, 3), swizzle!(*c, 2, 1, 3, 3)),
-        ),
-    );
-    let p2 = _mm_add_ps(
-        p2,
-        _mm_mul_ps(swizzle!(*b, 1, 3, 2, 1), swizzle!(*d, 2, 1, 3, 1)),
-    );
-    let p2 = _mm_sub_ps(
-        p2,
-        _mm_xor_ps(
-            flip,
-            _mm_mul_ps(swizzle!(*b, 2, 1, 3, 3), swizzle!(*d, 1, 3, 2, 3)),
-        ),
-    );
-    let c2 = _mm_unpackhi_ps(*c, *c);
-    let d2 = _mm_unpackhi_ps(*d, *d);
-    let p2 = _mm_add_ss(p2, _mm_mul_ss(a2, c2));
-    let p2 = _mm_add_ss(p2, _mm_mul_ss(b2, d2));
+    let p1 = shuffle!(a, [3, 1, 2, 1]) * shuffle!(b, [2, 3, 1, 1]);
+    let p1 = (p1 ^ flip) - shuffle!(a, [2, 3, 1, 3]) * shuffle!(b, [3, 1, 2, 3]);
+    let p1 = p1.sub_scalar(a2.mul_scalar(b2));
+
+    let p2 = shuffle!(a, [2, 1, 3, 1]) * shuffle!(c, [1, 3, 2, 1]);
+    let p2 = p2 - (flip ^ (shuffle!(a, [1, 3, 2, 3]) * shuffle!(c, [2, 1, 3, 3])));
+    let p2 = p2 + shuffle!(b, [1, 3, 2, 1]) * shuffle!(d, [2, 1, 3, 1]);
+    let p2 = p2 - (flip ^ (shuffle!(b, [2, 1, 3, 3]) * shuffle!(d, [1, 3, 2, 3])));
+    let p2 = p2.add_scalar(a2.mul_scalar(c2));
+    let p2 = p2.add_scalar(b2.mul_scalar(d2));
 
     Motor::from((p1, p2))
 });
@@ -227,7 +144,7 @@ impl_gp!(|b: Motor, a: Translator| -> Motor {
 
 /// Compose the action of two motors (`b` will be applied, then `a`)
 impl_gp!(|a: Motor, b: Motor| -> Motor {
-    Motor::from(gp_mm(a.p1, a.p2, b.p1, b.p2))
+    Motor::from(gp_mm(a.p1.into(), a.p2.into(), b.p1.into(), b.p2.into()))
 });
 
 use crate::arch::sse::*;
@@ -484,7 +401,7 @@ pub unsafe fn gp12_false(a: __m128, b: __m128) -> __m128 {
 }
 
 // Optimized motor * motor operation
-pub unsafe fn gp_mm(a: __m128, b: __m128, c: __m128, d: __m128) -> (__m128, __m128) {
+pub unsafe fn gp_mm(a: f32x4, b: f32x4, c: f32x4, d: f32x4) -> (f32x4, f32x4) {
     // (a0 c0 - a1 c1 - a2 c2 - a3 c3) +
     // (a0 c1 + a3 c2 + a1 c0 - a2 c3) e23 +
     // (a0 c2 + a1 c3 + a2 c0 - a3 c1) e31 +
@@ -499,34 +416,25 @@ pub unsafe fn gp_mm(a: __m128, b: __m128, c: __m128, d: __m128) -> (__m128, __m1
     // (a0 d3 + b3 c0 + a2 d1 + b2 c1 - a3 d0 - a1 d2 - b0 c3 - b1 c2)
     //  e03
 
-    let a_xxxx = swizzle!(a, 0, 0, 0, 0);
-    let a_zyzw = swizzle!(a, 3, 2, 1, 2);
-    let a_ywyz = swizzle!(a, 2, 1, 3, 1);
-    let a_wzwy = swizzle!(a, 1, 3, 2, 3);
-    let c_wwyz = swizzle!(c, 2, 1, 3, 3);
-    let c_yzwy = swizzle!(c, 1, 3, 2, 1);
-    let s_flip = _mm_set_ss(-0.0);
+    let a_xxxx = shuffle!(a, [0, 0, 0, 0]);
+    let a_zyzw = shuffle!(a, [3, 2, 1, 2]);
+    let a_ywyz = shuffle!(a, [2, 1, 3, 1]);
+    let a_wzwy = shuffle!(a, [1, 3, 2, 3]);
+    let c_wwyz = shuffle!(c, [2, 1, 3, 3]);
+    let c_yzwy = shuffle!(c, [1, 3, 2, 1]);
+    let s_flip = f32x4::set_scalar(-0.0);
 
-    let p1 = _mm_mul_ps(a_xxxx, c);
-    let tmp = _mm_mul_ps(a_ywyz, c_yzwy);
-    let tmp = _mm_add_ps(tmp, _mm_mul_ps(a_zyzw, swizzle!(c, 0, 0, 0, 2)));
-    let tmp = _mm_xor_ps(tmp, s_flip);
-    let p1 = _mm_add_ps(p1, tmp);
-    let p1 = _mm_sub_ps(p1, _mm_mul_ps(a_wzwy, c_wwyz));
+    let tmp = (a_ywyz * c_yzwy + a_zyzw * shuffle!(c, [0, 0, 0, 2])) ^ s_flip;
+    let p1 = a_xxxx * c + tmp - a_wzwy * c_wwyz;
 
-    let p2 = _mm_mul_ps(a_xxxx, d);
-    let p2 = _mm_add_ps(p2, _mm_mul_ps(b, swizzle!(c, 0, 0, 0, 0)));
-    let p2 = _mm_add_ps(p2, _mm_mul_ps(a_ywyz, swizzle!(d, 1, 3, 2, 1)));
-    let p2 = _mm_add_ps(p2, _mm_mul_ps(swizzle!(b, 2, 1, 3, 1), c_yzwy));
-    let tmp = _mm_mul_ps(a_zyzw, swizzle!(d, 0, 0, 0, 2));
-    let tmp = _mm_add_ps(tmp, _mm_mul_ps(a_wzwy, swizzle!(d, 2, 1, 3, 3)));
-    let tmp = _mm_add_ps(
-        tmp,
-        _mm_mul_ps(swizzle!(b, 0, 0, 0, 2), swizzle!(c, 3, 2, 1, 2)),
-    );
-    let tmp = _mm_add_ps(tmp, _mm_mul_ps(swizzle!(b, 1, 3, 2, 3), c_wwyz));
-    let tmp = _mm_xor_ps(tmp, s_flip);
-    let p2 = _mm_sub_ps(p2, tmp);
+    let p2 = a_xxxx * d + b * shuffle!(c, [0, 0, 0, 0]);
+    let p2 = p2 + a_ywyz * shuffle!(d, [1, 3, 2, 1]);
+    let p2 = p2 + shuffle!(b, [2, 1, 3, 1]) * c_yzwy;
+    let tmp = a_zyzw * shuffle!(d, [0, 0, 0, 2]);
+    let tmp = tmp + a_wzwy * shuffle!(d, [2, 1, 3, 3]);
+    let tmp = tmp + shuffle!(b, [0, 0, 0, 2]) * shuffle!(c, [3, 2, 1, 2]);
+    let tmp = tmp + shuffle!(b, [1, 3, 2, 3]) * c_wwyz;
+    let p2 = p2 - (tmp ^ s_flip);
 
     (p1, p2) // e f
 }

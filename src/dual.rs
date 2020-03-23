@@ -1,4 +1,4 @@
-/// A dual number is a multivector of the form _p_&#xFF0B;_q_**e**&#x2080;&#x2081;&#x2082;&#x2083;
+/// A dual number is a multivector of the form $`p + q\mathbf{e}_{0123}`$.
 #[derive(Clone, Copy)]
 pub struct Dual {
     pub(crate) p: f32,

@@ -9,3 +9,6 @@ wide = "0.4.3"
 
 [dev-dependencies]
 approx = "0.3.2"
+
+[package.metadata.docs.rs]
+rustdoc-args = ["--html-in-header", ".cargo/katex.html"]

@@ -1,6 +1,6 @@
 use crate::arch::f32x4;
 
-/// Directions in **P**(&#x211d;&#x00B3;&#x2083;&#x2080;&#x2081;) are represented using
+/// Directions in $`\mathbf{P}(\mathbb{R}^3_{3, 0, 1})`$ are represented using
 /// points at infinity (homogeneous coordinate 0). Having a homogeneous
 /// coordinate of zero ensures that directions are translation-invariant.
 #[derive(Clone, Copy)]
@@ -15,7 +15,7 @@ impl Direction {
     }
 
     /*
-    /// Data should point to four floats with memory layout `(0.f, x, y, z)`
+    /// Data should point to four floats with memory layout `(0.0, x, y, z)`
     /// where the zero occupies the lowest address in memory.
     pub fn load(&mut self, data: [f32; 4]) {
         debug_assert_eq!(data[0], 0.0, "Homogeneous coordinate of point data used to initialize a direction must be exactly zero");
