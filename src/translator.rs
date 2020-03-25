@@ -17,7 +17,7 @@ impl Translator {
 
     #[doc(hidden)]
     pub fn raw(a: f32, b: f32, c: f32, d: f32) -> Self {
-        Self::from(f32x4::new(a, b, c, d).0)
+        Self::from(f32x4::new(a, b, c, d))
     }
 
     /// Fast load operation for packed data that is already normalized. The
@@ -46,13 +46,16 @@ impl Translator {
     /// Conjugates a plane $p$ with this translator and returns the result
     /// $tp\widetilde{t}$.
     pub fn conj_plane(&self, p: Plane) -> Plane {
-        Plane::from(crate::arch::sw02(p.p0, self.p2.blend1(f32x4::set_scalar(1.0))))
+        Plane::from(crate::arch::sw02(
+            p.p0,
+            self.p2.blend1(f32x4::set_scalar(1.0)),
+        ))
     }
 
     /// Conjugates a line $`\ell`$ with this translator and returns the result
     /// $`t\ell\widetilde{t}`$.
     pub fn conj_line(&self, l: Line) -> Line {
-        unsafe { Line::from(crate::arch::sw_l2(l.p1.into(), l.p2.into(), self.p2.0)) }
+        Line::from(crate::arch::sw_l2(l.p1, l.p2, self.p2))
     }
 
     /// Conjugates a point $p$ with this translator and returns the result

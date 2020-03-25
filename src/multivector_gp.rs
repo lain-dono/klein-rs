@@ -49,8 +49,8 @@ impl_gp!(|a: Line, b: Line| -> Motor {
     // (a1 c3 - a3 c1         + b3 d1 - b1 d3) e02 +
     // (a2 c1 - a1 c2         + b1 d2 - b2 d1) e03 +
 
-    let (a, d) = (f32x4::from(a.p1), f32x4::from(a.p2));
-    let (b, c) = (f32x4::from(b.p1), f32x4::from(b.p2));
+    let (a, d) = (a.p1, a.p2);
+    let (b, c) = (b.p1, b.p2);
 
     let a2 = a.unpackhi();
     let b2 = b.unpackhi();
@@ -94,7 +94,7 @@ impl_gp!(|b: Line, a: Dual| -> Line { a * b });
 impl_gp!(|a: Rotor, b: Translator| -> Motor {
     Motor {
         p1: a.p1,
-        p2: gp_rt_false(a.p1.0, b.p2.0).into(),
+        p2: gp_rt_false(a.p1, b.p2),
     }
 });
 
@@ -102,7 +102,7 @@ impl_gp!(|a: Rotor, b: Translator| -> Motor {
 impl_gp!(|b: Translator, a: Rotor| -> Motor {
     Motor {
         p1: a.p1,
-        p2: gp_rt_true(a.p1.into(), b.p2.into()).into(),
+        p2: gp_rt_true(a.p1, b.p2),
     }
 });
 
@@ -114,7 +114,7 @@ impl_gp!(|a: Translator, b: Translator| -> Translator { a + b });
 impl_gp!(|a: Rotor, b: Motor| -> Motor {
     Motor {
         p1: gp11(a.p1.into(), b.p1.into()).into(),
-        p2: gp12_false(a.p1.into(), b.p2.into()).into(),
+        p2: gp12_false(a.p1, b.p2),
     }
 });
 
@@ -122,7 +122,7 @@ impl_gp!(|a: Rotor, b: Motor| -> Motor {
 impl_gp!(|b: Motor, a: Rotor| -> Motor {
     Motor {
         p1: gp11(b.p1.into(), a.p1.into()).into(),
-        p2: gp12_true(a.p1.into(), b.p2.into()).into(),
+        p2: gp12_true(a.p1, b.p2),
     }
 });
 
@@ -130,7 +130,7 @@ impl_gp!(|b: Motor, a: Rotor| -> Motor {
 impl_gp!(|a: Translator, b: Motor| -> Motor {
     Motor {
         p1: b.p1,
-        p2: _mm_add_ps(gp_rt_true(b.p1.into(), a.p2.into()), b.p2.into()).into(),
+        p2: gp_rt_true(b.p1, a.p2) + b.p2,
     }
 });
 
@@ -138,13 +138,13 @@ impl_gp!(|a: Translator, b: Motor| -> Motor {
 impl_gp!(|b: Motor, a: Translator| -> Motor {
     Motor {
         p1: b.p1,
-        p2: _mm_add_ps(gp_rt_false(b.p1.0, a.p2.0), b.p2.0).into(),
+        p2: gp_rt_false(b.p1, a.p2) + b.p2,
     }
 });
 
 /// Compose the action of two motors (`b` will be applied, then `a`)
 impl_gp!(|a: Motor, b: Motor| -> Motor {
-    Motor::from(gp_mm(a.p1.into(), a.p2.into(), b.p1.into(), b.p2.into()))
+    Motor::from(gp_mm(a.p1, a.p2, b.p1, b.p2))
 });
 
 use crate::arch::sse::*;
@@ -242,12 +242,9 @@ pub unsafe fn gp03_true(a: __m128, b: __m128) -> (__m128, __m128) {
         _mm_mul_ps(swizzle!(a, 1, 3, 2, 0), swizzle!(b, 2, 1, 3, 0)),
     );
 
-    // Compute a0 b0 + a1 b1 + a2 b2 + a3 b3 and store it in the low
-    // component
-    let tmp = dp(a, b);
-
+    // Compute a0 b0 + a1 b1 + a2 b2 + a3 b3 and store it in the low component
+    let tmp = dp(a.into(), b.into()).0;
     let tmp = _mm_xor_ps(tmp, _mm_set_ss(-0.0));
-
     let p2 = _mm_add_ps(p2, tmp);
 
     (p1, p2)
@@ -270,7 +267,7 @@ pub unsafe fn gp03_false(a: __m128, b: __m128) -> (__m128, __m128) {
 
     // Compute a0 b0 + a1 b1 + a2 b2 + a3 b3 and store it in the low
     // component
-    let tmp = dp(a, b);
+    let tmp = dp(a.into(), b.into()).0;
     let p2 = _mm_add_ps(p2, tmp);
 
     (p1, p2)
@@ -320,7 +317,7 @@ pub unsafe fn gp33(a: __m128, b: __m128) -> __m128 {
     // (0, 1, 2, 3) -> (0, 0, 2, 2)
     let ss = _mm_moveldup_ps(tmp);
     let ss = _mm_movelh_ps(ss, ss);
-    let tmp = _mm_mul_ps(tmp, rcp_nr1(ss.into()).0);
+    let tmp = _mm_mul_ps(tmp, f32x4::rcp_nr1(ss.into()).0);
 
     if cfg!(target_feature = "sse4.1") {
         _mm_blend_ps(tmp, _mm_setzero_ps(), 1)
@@ -344,64 +341,41 @@ pub unsafe fn gp_dl(u: f32, v: f32, b: __m128, c: __m128) -> (__m128, __m128) {
     (p1, p2)
 }
 
-pub unsafe fn gp_rt_true(a: __m128, b: __m128) -> __m128 {
+pub fn gp_rt_true(a: f32x4, b: f32x4) -> f32x4 {
     // (a1 b1 + a2 b2 + a3 b3) e0123 +
     // (a0 b1 + a2 b3 - a3 b2) e01 +
     // (a0 b2 + a3 b1 - a1 b3) e02 +
     // (a0 b3 + a1 b2 - a2 b1) e03
 
-    let p2 = _mm_mul_ps(swizzle!(a, 0, 0, 0, 1), swizzle!(b, 3, 2, 1, 1));
-    let p2 = _mm_add_ps(
-        p2,
-        _mm_mul_ps(swizzle!(a, 1, 3, 2, 2), swizzle!(b, 2, 1, 3, 2)),
-    );
-    _mm_sub_ps(
-        p2,
-        _mm_xor_ps(
-            _mm_set_ss(-0.0),
-            _mm_mul_ps(swizzle!(a, 2, 1, 3, 3), swizzle!(b, 1, 3, 2, 3)),
-        ),
-    )
+    let p2 = shuffle!(a, [0, 0, 0, 1]) * shuffle!(b, [3, 2, 1, 1]);
+    let p2 = p2 + shuffle!(a, [1, 3, 2, 2]) * shuffle!(b, [2, 1, 3, 2]);
+
+    p2 - (f32x4::set_scalar(-0.0) ^ (shuffle!(a, [2, 1, 3, 3]) * shuffle!(b, [1, 3, 2, 3])))
 }
 
-pub unsafe fn gp_rt_false(a: __m128, b: __m128) -> __m128 {
+pub fn gp_rt_false(a: f32x4, b: f32x4) -> f32x4 {
     // (a1 b1 + a2 b2 + a3 b3) e0123 +
     // (a0 b1 + a3 b2 - a2 b3) e01 +
     // (a0 b2 + a1 b3 - a3 b1) e02 +
     // (a0 b3 + a2 b1 - a1 b2) e03
 
-    let p2 = _mm_mul_ps(swizzle!(a, 0, 0, 0, 1), swizzle!(b, 3, 2, 1, 1));
-    let p2 = _mm_add_ps(
-        p2,
-        _mm_mul_ps(swizzle!(a, 2, 1, 3, 2), swizzle!(b, 1, 3, 2, 2)),
-    );
-    _mm_sub_ps(
-        p2,
-        _mm_xor_ps(
-            _mm_set_ss(-0.0),
-            _mm_mul_ps(swizzle!(a, 1, 3, 2, 3), swizzle!(b, 2, 1, 3, 3)),
-        ),
-    )
+    let p2 = shuffle!(a, [0, 0, 0, 1]) * shuffle!(b, [3, 2, 1, 1]);
+    let p2 = p2 + shuffle!(a, [2, 1, 3, 2]) * shuffle!(b, [1, 3, 2, 2]);
+    p2 - (f32x4::set_scalar(-0.0) ^ (shuffle!(a, [1, 3, 2, 3]) * shuffle!(b, [2, 1, 3, 3])))
 }
 
-pub unsafe fn gp12_true(a: __m128, b: __m128) -> __m128 {
+pub fn gp12_true(a: f32x4, b: f32x4) -> f32x4 {
     let p2 = gp_rt_true(a, b);
-    _mm_sub_ps(
-        p2,
-        _mm_xor_ps(_mm_set_ss(-0.0), _mm_mul_ps(a, swizzle!(b, 0, 0, 0, 0))),
-    )
+    p2 - (f32x4::set_scalar(-0.0) ^ (a * shuffle!(b, [0, 0, 0, 0])))
 }
 
-pub unsafe fn gp12_false(a: __m128, b: __m128) -> __m128 {
+pub fn gp12_false(a: f32x4, b: f32x4) -> f32x4 {
     let p2 = gp_rt_false(a, b);
-    _mm_sub_ps(
-        p2,
-        _mm_xor_ps(_mm_set_ss(-0.0), _mm_mul_ps(a, swizzle!(b, 0, 0, 0, 0))),
-    )
+    p2 - (f32x4::set_scalar(-0.0) ^ (a * shuffle!(b, [0, 0, 0, 0])))
 }
 
 // Optimized motor * motor operation
-pub unsafe fn gp_mm(a: f32x4, b: f32x4, c: f32x4, d: f32x4) -> (f32x4, f32x4) {
+pub fn gp_mm(a: f32x4, b: f32x4, c: f32x4, d: f32x4) -> (f32x4, f32x4) {
     // (a0 c0 - a1 c1 - a2 c2 - a3 c3) +
     // (a0 c1 + a3 c2 + a1 c0 - a2 c3) e23 +
     // (a0 c2 + a1 c3 + a2 c0 - a3 c1) e31 +

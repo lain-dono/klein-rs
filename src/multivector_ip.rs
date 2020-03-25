@@ -16,59 +16,44 @@ macro_rules! impl_dot {
 }
 
 impl_dot!(|a: Plane, b: Plane| -> f32 { f32x4::hi_dp(a.p0, b.p0).first() });
-impl_dot!(|a: Line, b: Line| -> f32 {
-    (f32x4::all(-0.0) ^ f32x4::hi_dp_ss(a.p1, b.p1)).first()
-});
+impl_dot!(|a: Line, b: Line| -> f32 { (f32x4::all(-0.0) ^ f32x4::hi_dp_ss(a.p1, b.p1)).first() });
 impl_dot!(|a: Point, b: Point| -> f32 {
     // -a0 b0
     (f32x4::all(-1.0) * (a.p3 * b.p3)).first()
 });
 
 impl_dot!(|a: Plane, b: Line| -> Plane {
-    let a = f32x4::from(a.p0);
-    let (b, c) = (f32x4::from(b.p1), f32x4::from(b.p2));
-
     // -(a1 c1 + a2 c2 + a3 c3) e0 +
     // (a2 b1 - a1 b2) e3
     // (a3 b2 - a2 b3) e1 +
     // (a1 b3 - a3 b1) e2 +
 
-    let p0 = shuffle!(a, [1, 3, 2, 0]) * b;
-    let p0 = p0 - a * shuffle!(b, [1, 3, 2, 0]);
-    let p0 = shuffle!(p0, [1, 3, 2, 0]).sub_scalar(f32x4::hi_dp_ss(a, c));
+    let p0 = shuffle!(a.p0, [1, 3, 2, 0]) * b.p1;
+    let p0 = p0 - a.p0 * shuffle!(b.p1, [1, 3, 2, 0]);
+    let p0 = shuffle!(p0, [1, 3, 2, 0]).sub_scalar(f32x4::hi_dp_ss(a.p0, b.p2));
 
     Plane::from(p0)
 });
 impl_dot!(|b: Line, a: Plane| -> Plane {
-    let a = f32x4::from(a.p0);
-    let (b, c) = (f32x4::from(b.p1), f32x4::from(b.p2));
 
     // (a1 c1 + a2 c2 + a3 c3) e0 +
     // (a1 b2 - a2 b1) e3
     // (a2 b3 - a3 b2) e1 +
     // (a3 b1 - a1 b3) e2 +
 
-    let p0 = a * shuffle!(b, [1, 3, 2, 0]);
-    let p0 = p0 - b * shuffle!(a, [1, 3, 2, 0]);
-    let p0 = shuffle!(p0, [1, 3, 2, 0]).add_scalar(f32x4::hi_dp_ss(a, c));
+    let p0 = a.p0 * shuffle!(b.p1, [1, 3, 2, 0]);
+    let p0 = p0 - b.p1 * shuffle!(a.p0, [1, 3, 2, 0]);
+    let p0 = shuffle!(p0, [1, 3, 2, 0]).add_scalar(f32x4::hi_dp_ss(a.p0, b.p2));
 
     Plane::from(p0)
 });
 
 impl_dot!(|a: Plane, b: IdealLine| -> Plane {
-    let p0 = a.p0.into();
-    let p2 = b.p2.into();
-    (f32x4::hi_dp(p0, p2) ^ f32x4::all(-0.0)).into()
+    Plane::from(f32x4::hi_dp(a.p0, b.p2) ^ f32x4::all(-0.0))
 });
-impl_dot!(|b: IdealLine, a: Plane| -> Plane {
-    let p0 = a.p0.into();
-    let p2 = b.p2.into();
-    Plane::from(f32x4::hi_dp(p0, p2))
-});
+impl_dot!(|b: IdealLine, a: Plane| -> Plane { Plane::from(f32x4::hi_dp(a.p0, b.p2)) });
 
 impl_dot!(|a: Plane, b: Point| -> Line {
-    let a = f32x4::from(a.p0);
-    let b = f32x4::from(b.p3);
     // The symmetric inner product on these two partitions commutes
 
     // (a2 b1 - a1 b2) e03 +
@@ -78,10 +63,10 @@ impl_dot!(|a: Plane, b: Point| -> Line {
     // a2 b0 e31 +
     // a3 b0 e12
 
-    let p1 = (a * shuffle!(b, [0, 0, 0, 0])).blend_and();
-    let sa = shuffle!(a, [1, 3, 2, 0]);
-    let sb = shuffle!(b, [1, 3, 2, 0]);
-    let p2 = shuffle!(b * sa - a * sb, [1, 3, 2, 0]);
+    let p1 = (a.p0 * shuffle!(b.p3, [0, 0, 0, 0])).blend_and();
+    let sa = shuffle!(a.p0, [1, 3, 2, 0]);
+    let sb = shuffle!(b.p3, [1, 3, 2, 0]);
+    let p2 = shuffle!(b.p3 * sa - a.p0 * sb, [1, 3, 2, 0]);
 
     Line::from((p1, p2))
 });

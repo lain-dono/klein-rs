@@ -68,8 +68,8 @@ impl Rotor {
 
     /// Constrains the rotor to traverse the shortest arc
     pub fn constrain(&mut self) {
-            let mask = shuffle!(self.p1 & f32x4::set_scalar(-0.0), [0, 0, 0, 0]);
-            self.p1 = mask ^ self.p1;
+        let mask = shuffle!(self.p1 & f32x4::set_scalar(-0.0), [0, 0, 0, 0]);
+        self.p1 = mask ^ self.p1;
     }
 
     pub fn constrained(mut self) -> Self {
@@ -121,7 +121,7 @@ impl Rotor {
         unsafe {
             use core::iter::once;
             let mut out: Plane = core::mem::uninitialized();
-            crate::arch::sw012(once(&p.p0), self.p1.into(), None, once(&mut out.p0));
+            crate::arch::sw012(once(&p.p0), self.p1, None, once(&mut out.p0));
             out
         }
     }
@@ -140,24 +140,20 @@ impl Rotor {
         unsafe {
             crate::arch::sw012(
                 input.iter().map(|d| &d.p0),
-                self.p1.into(),
+                self.p1,
                 None,
                 out.iter_mut().map(|d| &mut d.p0),
             )
         }
     }
 
-    /*
     pub fn conj_branch(&self, b: Branch) -> Branch {
-        unsafe {
-            use core::iter::once;
+        use core::iter::once;
 
-            let out: Branch = core::mem::uninitialized();
-            sw_mm1(once(&b.p1), self.p1, None, once(&mut out.p1));
-            out
-        }
+        let mut out: Branch = unsafe { core::mem::uninitialized() };
+        crate::arch::sw_mm1(once(&b.p1), self.p1, once(&mut out.p1));
+        out
     }
-    */
 
     /*
     /// Conjugates a line $\ell$ with this rotor and returns the result
@@ -188,12 +184,10 @@ impl Rotor {
     /// $rp\widetilde{r}$.
     pub fn conj_point(&self, p: Point) -> Point {
         // NOTE: Conjugation of a plane and point with a rotor is identical
-        unsafe {
-            use core::iter::once;
-            let mut out: Point = core::mem::uninitialized();
-            crate::arch::sw012(once(&p.p3), self.p1.into(), None, once(&mut out.p3));
-            out
-        }
+        use core::iter::once;
+        let mut out: Point = unsafe { core::mem::uninitialized() };
+        crate::arch::sw012(once(&p.p3), self.p1, None, once(&mut out.p3));
+        out
     }
 
     /// Conjugates an array of points with this rotor in the input array and
@@ -210,7 +204,7 @@ impl Rotor {
         unsafe {
             crate::arch::sw012(
                 input.iter().map(|d| &d.p3),
-                self.p1.into(),
+                self.p1,
                 None,
                 out.iter_mut().map(|d| &mut d.p3),
             );
@@ -224,7 +218,7 @@ impl Rotor {
             use core::iter::once;
             let mut out: Direction = core::mem::uninitialized();
             // NOTE: Conjugation of a plane and point with a rotor is identical
-            crate::arch::sw012(once(&d.p3), self.p1.into(), None, once(&mut out.p3));
+            crate::arch::sw012(once(&d.p3), self.p1, None, once(&mut out.p3));
             out
         }
     }
@@ -243,7 +237,7 @@ impl Rotor {
         unsafe {
             crate::arch::sw012(
                 input.iter().map(|d| &d.p3),
-                self.p1.into(),
+                self.p1,
                 None,
                 out.iter_mut().map(|d| &mut d.p3),
             )

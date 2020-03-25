@@ -3,10 +3,9 @@
 #[macro_use]
 pub mod sse;
 
-mod exp_log;
 mod sandwitch;
 
-pub use self::{exp_log::*, sandwitch::*, sse::*};
+pub use self::{sandwitch::*, sse::*};
 
 use core::arch::x86_64::*;
 
@@ -20,6 +19,7 @@ impl core::fmt::Debug for f32x4 {
     }
 }
 
+/*
 impl std::ops::Deref for f32x4 {
     type Target = __m128;
     #[inline(always)]
@@ -27,6 +27,7 @@ impl std::ops::Deref for f32x4 {
         &self.0
     }
 }
+*/
 
 impl Into<[f32; 4]> for f32x4 {
     #[inline(always)]
@@ -249,19 +250,45 @@ impl f32x4 {
 }
 
 impl f32x4 {
+    // Reciprocal with an additional single Newton-Raphson refinement
     #[inline(always)]
     pub fn rcp_nr1(self) -> Self {
-        rcp_nr1(self)
+        // f(x) = 1/x - a
+        // f'(x) = -1/x^2
+        // x_{n+1} = x_n - f(x)/f'(x)
+        //         = 2x_n - a x_n^2 = x_n (2 - a x_n)
+
+        // ~2.7x baseline with ~22 bits of accuracy
+        let xn = self.recip();
+        xn * (f32x4::all(2.0) - self * xn)
     }
 
+    // Sqrt Newton-Raphson is evaluated in terms of rsqrt_nr1
     #[inline(always)]
     pub fn sqrt_nr1(self) -> Self {
-        Self(unsafe { sqrt_nr1(self.0) })
+        self * self.rsqrt_nr1()
+    }
+
+    // Reciprocal sqrt with an additional single Newton-Raphson refinement.
+    #[inline(always)]
+    pub fn rsqrt_nr1(self) -> Self {
+        // f(x) = 1/x^2 - a
+        // f'(x) = -1/(2x^(3/2))
+        // Let x_n be the estimate, and x_{n+1} be the refinement
+        // x_{n+1} = x_n - f(x)/f'(x)
+        //         = 0.5 * x_n * (3 - a x_n^2)
+
+        // From Intel optimization manual: expected performance is ~5.2x
+        // baseline (sqrtps + divps) with ~22 bits of accuracy
+
+        let xn = self.rsqrt();
+        let xn3 = f32x4::all(3.0) - self * xn * xn;
+        f32x4::all(0.5) * xn * xn3
     }
 
     #[inline(always)]
-    pub fn rsqrt_nr1(self) -> Self {
-        Self(unsafe { rsqrt_nr1(self.0) })
+    pub fn rsqrt(self) -> Self {
+        Self(unsafe { _mm_rsqrt_ps(self.0) })
     }
 
     pub fn movehdup(self) -> Self {
@@ -272,24 +299,28 @@ impl f32x4 {
         Self::from(unsafe { _mm_movehl_ps(self.0, self.0) })
     }
 
+    pub fn movehl_ps(self, b: Self) -> Self {
+        Self::from(unsafe { _mm_movehl_ps(self.0, b.0) })
+    }
+
     pub fn dp(a: Self, b: Self) -> Self {
-        Self(unsafe { dp(a.0, b.0) })
+        dp(a, b)
     }
 
     pub fn dp_bc(a: Self, b: Self) -> Self {
-        Self(unsafe { dp_bc(a.0, b.0) })
+        dp_bc(a, b)
     }
 
     pub fn hi_dp(a: Self, b: Self) -> Self {
-        Self(unsafe { hi_dp(a.0, b.0) })
+        hi_dp(a, b)
     }
 
     pub fn hi_dp_ss(a: Self, b: Self) -> Self {
-        Self(unsafe { hi_dp_ss(a.0, b.0) })
+        hi_dp_ss(a, b)
     }
 
     pub fn hi_dp_bc(a: Self, b: Self) -> Self {
-        Self(unsafe { hi_dp_bc(a.0, b.0) })
+        hi_dp_bc(a, b)
     }
 
     pub fn cast_i32(a: i32, b: i32, c: i32, d: i32) -> Self {

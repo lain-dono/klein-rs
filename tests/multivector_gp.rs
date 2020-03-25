@@ -73,7 +73,6 @@ fn line_normalization() {
 
 #[test]
 fn branch_branch() {
-    /*
     let b1 = Branch::new (2.0, 1.0, 3.0);
     let b2 = Branch::new (1.0, -2.0, -3.0);
     let r: Rotor  = b2 * b1;
@@ -88,7 +87,6 @@ fn branch_branch() {
     abs_diff_eq!(b3.x(), b2.x());
     abs_diff_eq!(b3.y(), b2.y());
     abs_diff_eq!(b3.z(), b2.z());
-    */
 
     let b = Branch::new(2.0, 1.0, 3.0);
     let r: Rotor = b / b;
@@ -98,9 +96,9 @@ fn branch_branch() {
     assert_eq!(r.e12(), 0.0);
 }
 
-/*
 // line*line
 #[test]
+#[ignore]
 fn line_mul_line() {
     // a*e01 + b*e02 + c*e03 + d*e23 + e*e31 + f*e12
     let l1 = Line::new(1.0, 0.0, 0.0, 3.0, 2.0, 1.0);
@@ -116,12 +114,13 @@ fn line_mul_line() {
     assert_eq!(l1l2.e03(), -4.0);
     assert_eq!(l1l2.e0123(), 6.0);
 
+    /*
     let l1 = l1.normalized();
     let l2 = l2.normalized();
     let l3 = (l1 * l2).sqrt().conj_line(l2);
     assert!(l3.approx_eq(-l1, 0.001));
+    */
 }
-*/
 
 // line/line
 #[test]

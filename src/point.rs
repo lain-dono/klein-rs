@@ -6,15 +6,13 @@ use crate::arch::f32x4;
 #[derive(Clone, Copy)]
 pub struct Origin(pub(crate) Point);
 
-impl Default for Origin {
+impl Origin {
     /// On its own, the origin occupies no memory, but it can be casted as an
     /// entity at any point, at which point it is represented as
     /// $`\mathbf{e}_{123}`$.
     #[inline]
-    fn default() -> Self {
-        Self(Point {
-            p3: f32x4::set_scalar(1.0),
-        })
+    pub fn into_point() -> Point {
+        Point::from(f32x4::set_scalar(1.0))
     }
 }
 
@@ -28,7 +26,7 @@ impl Point {
     /// initialized to 1)
     #[inline]
     pub fn new(x: f32, y: f32, z: f32) -> Self {
-        Self::from(f32x4::new(z, y, x, 1.0).0)
+        Self::from(f32x4::new(z, y, x, 1.0))
     }
 
     /// Fast load from a pointer to an array of four floats with layout

@@ -43,20 +43,17 @@ fn motor_exp_log_sqrt() {
     abs_diff_eq!(m1.e03(), m2.e03());
     abs_diff_eq!(m1.e0123(), m2.e0123());
 
-    /*
     let m3 = m1.sqrt() * m1.sqrt();
     abs_diff_eq!(m1.scalar(), m3.scalar());
     abs_diff_eq!(m1.e12(), m3.e12());
-    abs_diff_eq!(m1.e13(), m3.e31());
+    abs_diff_eq!(m1.e31(), -m3.e31());
     abs_diff_eq!(m1.e23(), m3.e23());
     abs_diff_eq!(m1.e01(), m3.e01());
     abs_diff_eq!(m1.e02(), m3.e02());
     abs_diff_eq!(m1.e03(), m3.e03());
     abs_diff_eq!(m1.e0123(), m3.e0123());
-    */
 }
 
-/*
 #[test]
 fn motor_slerp() {
     // Construct a motor from a translator and rotor
@@ -88,7 +85,7 @@ fn motor_blend() {
     let t2 = Translator::new(12.0, -2.0, 0.4, 1.0);
     let m2: Motor = r2 * t2;
 
-    let motion: Motor = m2 * m1.reverse(); // ~
+    let motion: Motor = m2 * m1.reversed(); // ~
     let step: Line = motion.log() / 4.0;
     let step: Motor = step.exp();
 
@@ -104,4 +101,3 @@ fn motor_blend() {
     abs_diff_eq!(result.e03(), m2.e03());
     abs_diff_eq!(result.e0123(), m2.e0123());
 }
-*/

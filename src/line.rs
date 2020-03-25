@@ -139,6 +139,7 @@ impl Line {
     ///
     /// $$a\mathbf{e}_{01} + b\mathbf{e}_{02} + c\mathbf{e}_{03} +\
     /// d\mathbf{e}_{23} + e\mathbf{e}_{31} + f\mathbf{e}_{12}$$
+    #[allow(clippy::many_single_char_names)]
     pub fn new(a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> Self {
         Self {
             p1: f32x4::new(f, e, d, 0.0),

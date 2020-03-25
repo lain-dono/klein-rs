@@ -1,7 +1,7 @@
 use approx::abs_diff_eq;
 use klein::{
     arch::{f32x4, sw02},
-    Line, Plane, Point, Rotor,
+    Line, Motor, Plane, Point, Rotor, Translator,
 };
 use std::f32::consts::FRAC_PI_2;
 
@@ -55,22 +55,24 @@ fn reflect_point() {
     assert_eq!(p3.e123(), 14.0);
 }
 
-/*
 #[test]
+#[ignore]
 fn rotor_line() {
+    /*
     // Make an unnormalized rotor to verify correctness
-    let r = Rotor::.load_normalized([1.0, 4.0, -3.0, 2.0]);
+    let p1 = f32x4::from_array([1.0, 4.0, -3.0, 2.0]);
+    let r = Rotor::from(p1);
     // a*e01 + b*e01 + c*e02 + d*e23 + e*e31 + f*e12
     let l1 = Line::new(-1.0, 2.0, -3.0, -6.0, 5.0, 4.0);
-    let l2: Line = r. {r(l1)};
+    let l2: Line = r.conj_line(l1);
     assert_eq!(l2.e01(), -110.0);
     assert_eq!(l2.e02(), 20.0);
     assert_eq!(l2.e03(), 10.0);
     assert_eq!(l2.e12(), -240.0);
     assert_eq!(l2.e31(), 102.0);
     assert_eq!(l2.e23(), -36.0);
+    */
 }
-*/
 
 #[test]
 fn rotor_point() {
@@ -82,25 +84,24 @@ fn rotor_point() {
     assert_eq!(p2.z(), 0.0);
 }
 
-/*
-TEST_CASE("translator-point")
-{
-    translator t{1.0, 0.0, 0.0, 1.0};
-    point p1{1, 0, 0};
-    point p2 = t(p1);
+#[test]
+fn translator_point() {
+    let t = Translator::new(1.0, 0.0, 0.0, 1.0);
+    let p1 = Point::new(1.0, 0.0, 0.0);
+    let p2: Point = t.conj_point(p1);
     assert_eq!(p2.x(), 1.0);
     assert_eq!(p2.y(), 0.0);
     assert_eq!(p2.z(), 1.0);
 }
 
-TEST_CASE("translator-line")
-{
-    float data[4] = {0.0, -5.0, -2.0, 2.0};
-    translator t;
-    t.load_normalized(data);
+#[test]
+fn translator_line() {
+    let p2 = f32x4::from_array([0.0, -5.0, -2.0, 2.0]);
+    let t = Translator::from(p2);
+
     // a*e01 + b*e01 + c*e02 + d*e23 + e*e31 + f*e12
-    line l1{-1.0, 2.0, -3.0, -6.0, 5.0, 4.0};
-    line l2{t(l1)};
+    let l1 = Line::new(-1.0, 2.0, -3.0, -6.0, 5.0, 4.0);
+    let l2: Line = t.conj_line(l1);
     assert_eq!(l2.e01(), 35.0);
     assert_eq!(l2.e02(), -14.0);
     assert_eq!(l2.e03(), 71.0);
@@ -109,56 +110,62 @@ TEST_CASE("translator-line")
     assert_eq!(l2.e23(), -6.0);
 }
 
-TEST_CASE("construct-motor")
-{
+#[test]
+#[ignore]
+fn construct_motor() {
+    /*
     rotor r{M_PI * 0.5f, 0, 0, 1.0};
     translator t{1.0, 0.0, 0.0, 1.0};
     motor m = r * t;
     point p1{1, 0, 0};
     point p2 = m(p1);
     assert_eq!(p2.x(), 0.0);
-    assert_eq!(p2.y(), doctest::Approx(1.0));
-    assert_eq!(p2.z(), doctest::Approx(1.0));
+    abs_diff_eq!(p2.y(), 1.0);
+    abs_diff_eq!(p2.z(), 1.0);
 
     // Rotation and translation about the same axis commutes
-    m  = t * r;
-    p2 = m(p1);
+    let m  = t * r;
+    let p2 = m(p1);
     assert_eq!(p2.x(), 0.0);
-    assert_eq!(p2.y(), doctest::Approx(1.0));
-    assert_eq!(p2.z(), doctest::Approx(1.0));
+    abs_diff_eq!(p2.y(), 1.0);
+    abs_diff_eq!(p2.z(), 1.0);
 
-    line l = log(m);
+    let l: Line  = m.log();
     assert_eq!(l.e23(), 0.0);
     assert_eq!(l.e12(), doctest::Approx(-0.7854).epsilon(0.001));
     assert_eq!(l.e31(), 0.0);
     assert_eq!(l.e01(), 0.0);
     assert_eq!(l.e02(), 0.0);
     assert_eq!(l.e03(), doctest::Approx(-0.5));
+    */
 }
 
-TEST_CASE("construct-motor-via-screw-axis")
-{
-    motor m{M_PI * 0.5f, 1.0, line{0.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
-    point p1{1, 0, 0};
-    point p2 = m(p1);
-    assert_eq!(p2.x(), doctest::Approx(0.0));
-    assert_eq!(p2.y(), doctest::Approx(1.0));
-    assert_eq!(p2.z(), doctest::Approx(1.0));
+#[test]
+fn construct_motor_via_screw_axis() {
+    let line = Line::new(0.0, 0.0, 0.0, 0.0, 0.0, 1.0);
+    let m = Motor::from_line(FRAC_PI_2, 1.0, line);
+    let p1 = Point::new(1.0, 0.0, 0.0);
+    let p2 = m.conj_point(p1);
+    abs_diff_eq!(p2.x(), 0.0);
+    abs_diff_eq!(p2.y(), 1.0);
+    abs_diff_eq!(p2.z(), 1.0);
 }
 
-TEST_CASE("motor-plane")
-{
-    motor m{1.0, 4.0, 3.0, 2.0, 5.0, 6.0, 7.0, 8.0};
-    plane p1{3.0, 2.0, 1.0, -1.0};
-    plane p2 = m(p1);
+#[test]
+fn motor_plane() {
+    let m = Motor::new(1.0, 4.0, 3.0, 2.0, 5.0, 6.0, 7.0, 8.0);
+    let p1 = Plane::new(3.0, 2.0, 1.0, -1.0);
+    let p2 = m.conj_plane(p1);
     assert_eq!(p2.x(), 78.0);
     assert_eq!(p2.y(), 60.0);
     assert_eq!(p2.z(), 54.0);
     assert_eq!(p2.d(), 358.0);
 }
 
-TEST_CASE("motor-plane-variadic")
-{
+#[test]
+#[ignore]
+fn motor_plane_variadic() {
+    /*
     motor m{1.0, 4.0, 3.0, 2.0, 5.0, 6.0, 7.0, 8.0};
     plane ps[2] = {{3.0, 2.0, 1.0, -1.0}, {3.0, 2.0, 1.0, -1.0}};
     plane ps2[2];
@@ -171,21 +178,24 @@ TEST_CASE("motor-plane-variadic")
         assert_eq!(ps2[i].z(), 54.0);
         assert_eq!(ps2[i].d(), 358.0);
     }
+    */
 }
 
-TEST_CASE("motor-point")
-{
-    motor m{1.0, 4.0, 3.0, 2.0, 5.0, 6.0, 7.0, 8.0};
-    point p1{-1.0, 1.0, 2.0};
-    point p2 = m(p1);
+#[test]
+fn motor_point() {
+    let m = Motor::new(1.0, 4.0, 3.0, 2.0, 5.0, 6.0, 7.0, 8.0);
+    let p1 = Point::new(-1.0, 1.0, 2.0);
+    let p2 = m.conj_point(p1);
     assert_eq!(p2.x(), -12.0);
     assert_eq!(p2.y(), -86.0);
     assert_eq!(p2.z(), -86.0);
     assert_eq!(p2.w(), 30.0);
 }
 
-TEST_CASE("motor-point-variadic")
-{
+#[test]
+#[ignore]
+fn motor_point_variadic() {
+    /*
     motor m{1.0, 4.0, 3.0, 2.0, 5.0, 6.0, 7.0, 8.0};
     point ps[2] = {{-1.0, 1.0, 2.0}, {-1.0, 1.0, 2.0}};
     point ps2[2];
@@ -198,10 +208,13 @@ TEST_CASE("motor-point-variadic")
         assert_eq!(ps2[i].z(), -86.0);
         assert_eq!(ps2[i].w(), 30.0);
     }
+    */
 }
 
-TEST_CASE("motor-line")
-{
+#[test]
+#[ignore]
+fn motor_line() {
+    /*
     motor m{2.0, 4.0, 3.0, -1.0, -5.0, -2.0, 2.0, -3.0};
     // a*e01 + b*e01 + c*e02 + d*e23 + e*e31 + f*e12
     line l1{-1.0, 2.0, -3.0, -6.0, 5.0, 4.0};
@@ -212,10 +225,13 @@ TEST_CASE("motor-line")
     assert_eq!(l2.e12(), -214.0);
     assert_eq!(l2.e31(), -148.0);
     assert_eq!(l2.e23(), -40.0);
+    */
 }
 
-TEST_CASE("motor-line-variadic")
-{
+#[test]
+#[ignore]
+fn motor_line_variadic() {
+    /*
     motor m{2.0, 4.0, 3.0, -1.0, -5.0, -2.0, 2.0, -3.0};
     // a*e01 + b*e01 + c*e02 + d*e23 + e*e31 + f*e12
     line ls[2]
@@ -232,21 +248,24 @@ TEST_CASE("motor-line-variadic")
         assert_eq!(ls2[i].e31(), -148.0);
         assert_eq!(ls2[i].e23(), -40.0);
     }
+    */
 }
 
-TEST_CASE("motor-origin")
-{
-    rotor r{M_PI * 0.5f, 0, 0, 1.0};
-    translator t{1.0, 0.0, 0.0, 1.0};
-    motor m = r * t;
-    point p = m(origin{});
+#[test]
+fn motor_origin() {
+    let r = Rotor::new(FRAC_PI_2, 0.0, 0.0, 1.0);
+    let t = Translator::new(1.0, 0.0, 0.0, 1.0);
+    let m: Motor = r * t;
+    let p: Point = m.conj_origin();
     assert_eq!(p.x(), 0.0);
     assert_eq!(p.y(), 0.0);
-    assert_eq!(p.z(), doctest::Approx(1.0));
+    abs_diff_eq!(p.z(), 1.0);
 }
 
-TEST_CASE("motor-to-matrix")
-{
+#[test]
+#[ignore]
+fn motor_to_matrix4x4() {
+    /*
     motor m{1.0, 4.0, 3.0, 2.0, 5.0, 6.0, 7.0, 8.0};
     __m128 p1    = _mm_set_ps(1.0, 2.0, 1.0, -1.0);
     mat4x4 m_mat = m.as_mat4x4();
@@ -258,10 +277,13 @@ TEST_CASE("motor-to-matrix")
     assert_eq!(buf[1], -86.0);
     assert_eq!(buf[2], -86.0);
     assert_eq!(buf[3], 30.0);
+    */
 }
 
-TEST_CASE("motor-to-matrix-3x4")
-{
+#[test]
+#[ignore]
+fn motor_to_matrix3x4() {
+    /*
     motor m{1.0, 4.0, 3.0, 2.0, 5.0, 6.0, 7.0, 8.0};
     m.normalize();
     __m128 p1    = _mm_set_ps(1.0, 2.0, 1.0, -1.0);
@@ -274,54 +296,55 @@ TEST_CASE("motor-to-matrix-3x4")
     assert_eq!(buf[1], doctest::Approx(-86.0 / 30.0));
     assert_eq!(buf[2], doctest::Approx(-86.0 / 30.0));
     assert_eq!(buf[3], 1.0);
+    */
 }
 
-TEST_CASE("normalize-motor")
-{
-    motor m{1.0, 4.0, 3.0, 2.0, 5.0, 6.0, 7.0, 8.0};
-    m.normalize();
-    motor norm = m * ~m;
-    assert_eq!(norm.scalar(), doctest::Approx(1.0));
-    assert_eq!(norm.e0123(), doctest::Approx(0.0));
+#[test]
+#[ignore]
+fn normalize_motor() {
+    let m = Motor::new(1.0, 4.0, 3.0, 2.0, 5.0, 6.0, 7.0, 8.0);
+    let m = m.normalized();
+    let norm = m * m.reversed();
+    abs_diff_eq!(norm.scalar(), 1.0);
+    abs_diff_eq!(norm.e0123(), 0.0);
 }
 
-TEST_CASE("motor-sqrt")
-{
-    motor m{M_PI * 0.5f, 3.0, line{3.0, 1.0, 2.0, 4.0, -2.0, 1.0}.normalized()};
+#[test]
+fn motor_sqrt() {
+    let line = Line::new(3.0, 1.0, 2.0, 4.0, -2.0, 1.0).normalized();
+    let m = Motor::from_line(FRAC_PI_2, 3.0, line);
 
-    motor m2 = sqrt(m);
-    m2       = m2 * m2;
-    assert_eq!(m.scalar(), doctest::Approx(m2.scalar()));
-    assert_eq!(m.e01(), doctest::Approx(m2.e01()));
-    assert_eq!(m.e02(), doctest::Approx(m2.e02()));
-    assert_eq!(m.e03(), doctest::Approx(m2.e03()));
-    assert_eq!(m.e23(), doctest::Approx(m2.e23()));
-    assert_eq!(m.e31(), doctest::Approx(m2.e31()));
-    assert_eq!(m.e12(), doctest::Approx(m2.e12()));
-    assert_eq!(m.e0123(), doctest::Approx(m2.e0123()));
+    let m2 = m.sqrt();
+    let m2 = m2 * m2;
+    abs_diff_eq!(m.scalar(), m2.scalar());
+    abs_diff_eq!(m.e01(), m2.e01());
+    abs_diff_eq!(m.e02(), m2.e02());
+    abs_diff_eq!(m.e03(), m2.e03());
+    abs_diff_eq!(m.e23(), m2.e23());
+    abs_diff_eq!(m.e31(), m2.e31());
+    abs_diff_eq!(m.e12(), m2.e12());
+    abs_diff_eq!(m.e0123(), m2.e0123());
 }
 
-TEST_CASE("rotor-sqrt")
-{
-    rotor r{M_PI * 0.5f, 1, 2, 3};
+#[test]
+fn rotor_sqrt() {
+    let r = Rotor::new(FRAC_PI_2, 1.0, 2.0, 3.0);
 
-    rotor r2 = sqrt(r);
-    r2       = r2 * r2;
-    assert_eq!(r2.scalar(), doctest::Approx(r.scalar()));
-    assert_eq!(r2.e23(), doctest::Approx(r.e23()));
-    assert_eq!(r2.e31(), doctest::Approx(r.e31()));
-    assert_eq!(r2.e12(), doctest::Approx(r.e12()));
+    let r2 = r.sqrt();
+    let r2 = r2 * r2;
+    abs_diff_eq!(r2.scalar(), r.scalar());
+    abs_diff_eq!(r2.e23(), r.e23());
+    abs_diff_eq!(r2.e13(), r.e13());
+    abs_diff_eq!(r2.e12(), r.e12());
 }
 
-TEST_CASE("normalize-rotor")
-{
-    rotor r;
-    r.p1_ = _mm_set_ps(4.0, -3.0, 3.0, 28.0);
-    r.normalize();
-    rotor norm = r * ~r;
-    assert_eq!(norm.scalar(), doctest::Approx(1.0));
-    assert_eq!(norm.e12(), doctest::Approx(0.0));
-    assert_eq!(norm.e31(), doctest::Approx(0.0));
-    assert_eq!(norm.e23(), doctest::Approx(0.0));
+#[test]
+fn normalize_rotor() {
+    let p1 = f32x4::new(4.0, -3.0, 3.0, 28.0);
+    let r = Rotor::from(p1).normalized();
+    let norm: Rotor = r * r.reversed();
+    abs_diff_eq!(norm.scalar(), 1.0);
+    abs_diff_eq!(norm.e12(), 0.0);
+    abs_diff_eq!(norm.e13(), 0.0);
+    abs_diff_eq!(norm.e23(), 0.0);
 }
-*/

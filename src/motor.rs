@@ -1,4 +1,4 @@
-use crate::{arch::f32x4, Plane, Point, Rotor, Translator};
+use crate::{arch::f32x4, Direction, Dual, Line, Plane, Point, Rotor, Translator};
 
 #[derive(Clone, Copy)]
 pub struct Motor {
@@ -13,6 +13,7 @@ impl Motor {
     /// $a + b\mathbf{e}_{23} + c\mathbf{e}_{31} + d\mathbf{e}_{12} +\
     /// e\mathbf{e}_{01} + f\mathbf{e}_{02} + g\mathbf{e}_{03} +\
     /// h\mathbf{e}_{0123}$.
+    #[allow(clippy::many_single_char_names, clippy::too_many_arguments)]
     pub fn new(a: f32, b: f32, c: f32, d: f32, e: f32, f: f32, g: f32, h: f32) -> Self {
         Self {
             p1: f32x4::new(d, c, b, a),
@@ -20,40 +21,23 @@ impl Motor {
         }
     }
 
-    /*
-    pub fn store1(self) -> [f32; 4] {
-        unsafe {
-            let mut out = [0.0; 4];
-            _mm_store_ps(out.as_mut_ptr(), self.p1);
-            out
-        }
-    }
-
-    pub fn store2(self) -> [f32; 4] {
-        unsafe {
-            let mut out = [0.0; 4];
-            _mm_store_ps(out.as_mut_ptr(), self.p2);
-            out
-        }
-    }
-    */
-
-    /*
     /// Produce a screw motion rotating and translating by given amounts along a
     /// provided Euclidean axis.
-    motor(float ang_rad, float d, line l) noexcept
-    {
+    pub fn from_line(ang_rad: f32, d: f32, l: Line) -> Self {
+        let dual = Dual {
+            p: -ang_rad * 0.5,
+            q: d * 0.5,
+        };
+
+        (dual * l).exp()
+
+        /*
         line log_m;
         detail::gpDL(
-            -ang_rad * 0.5f, d * 0.5f, l.p1_, l.p2_, log_m.p1_, log_m.p2_);
+            , , l.p1, l.p2, log_m.p1_, log_m.p2_);
         detail::exp(log_m.p1_, log_m.p2_, p1_, p2_);
+        */
     }
-
-    motor(__m128 p1, __m128 p2) noexcept
-        : p1_{p1}
-        , p2_{p2}
-    {}
-    */
 
     #[inline]
     pub fn from_rotor(r: Rotor) -> Self {
@@ -209,27 +193,30 @@ impl Motor {
         unsafe {
             use core::iter::once;
             let mut out: Plane = core::mem::uninitialized();
-            crate::arch::sw012(once(&p.p0), self.p1.0, Some(&self.p2), once(&mut out.p0));
+            crate::arch::sw012(once(&p.p0), self.p1, Some(&self.p2), once(&mut out.p0));
             out
         }
     }
 
-    /*
     /// Conjugates an array of planes with this motor in the input array and
     /// stores the result in the output array. Aliasing is only permitted when
     /// `in == out` (in place motor application).
     ///
-    /// !!! tip
+    /// # tip
     ///
-    ///     When applying a motor to a list of tightly packed planes, this
-    ///     routine will be *significantly faster* than applying the motor to
-    ///     each plane individually.
-    void KLN_VEC_CALL operator()(plane* in, plane* out, size_t count) const
-        noexcept
-    {
-        detail::sw012<true, true>(&in->p0_, p1_, &p2_, &out->p0_, count);
+    /// When applying a motor to a list of tightly packed planes, this
+    /// routine will be *significantly faster* than applying the motor to
+    /// each plane individually.
+    pub fn conj_planes(&self, input: &[Point], out: &mut [Point]) {
+        unsafe {
+            crate::arch::sw012(
+                input.iter().map(|d| &d.p3),
+                self.p1,
+                Some(&self.p2),
+                out.iter_mut().map(|d| &mut d.p3),
+            );
+        }
     }
-    */
 
     /*
     /// Conjugates a line $\ell$ with this motor and returns the result
@@ -261,76 +248,68 @@ impl Motor {
     /// Conjugates a point $p$ with this motor and returns the result
     /// $mp\widetilde{m}$.
     #[inline]
-    pub fn conj_point(self, p: Point) -> Point {
-        unsafe {
-            use core::iter::once;
-            let mut out: Point = core::mem::uninitialized();
-            crate::arch::sw312(
-                once(&p.p3.0),
-                self.p1.0,
-                Some(&self.p2.0),
-                once(&mut out.p3.0),
-            );
-            out
-        }
+    pub fn conj_point(&self, p: Point) -> Point {
+        use core::iter::once;
+        let mut out: Point = unsafe { core::mem::uninitialized() };
+        crate::arch::sw312(once(&p.p3), self.p1, Some(&self.p2), once(&mut out.p3));
+        out
     }
 
-    /*
-        /// Conjugates an array of points with this motor in the input array and
-        /// stores the result in the output array. Aliasing is only permitted when
-        /// `in == out` (in place motor application).
-        ///
-        /// !!! tip
-        ///
-        ///     When applying a motor to a list of tightly packed points, this
-        ///     routine will be *significantly faster* than applying the motor to
-        ///     each point individually.
-        void KLN_VEC_CALL operator()(point* in, point* out, size_t count) const
-            noexcept
-        {
-            detail::sw312<true, true>(&in->p3_, p1_, &p2_, &out->p3_, count);
-        }
+    /// Conjugates an array of points with this motor in the input array and
+    /// stores the result in the output array. Aliasing is only permitted when
+    /// `in == out` (in place motor application).
+    ///
+    /// !!! tip
+    ///
+    ///     When applying a motor to a list of tightly packed points, this
+    ///     routine will be *significantly faster* than applying the motor to
+    ///     each point individually.
+    pub fn conj_points(&self, input: &[Point], output: &mut [Point]) {
+        crate::arch::sw312(
+            input.iter().map(|p| &p.p3),
+            self.p1,
+            Some(&self.p2),
+            output.iter_mut().map(|p| &mut p.p3),
+        )
+    }
 
-        /// Conjugates the origin $O$ with this motor and returns the result
-        /// $mO\widetilde{m}$.
-        [[nodiscard]] point KLN_VEC_CALL operator()(origin) const noexcept
-        {
-            point out;
-            out.p3_ = detail::swo12(p1_, p2_);
-            return out;
-        }
+    /// Conjugates the origin $`O`$ with this motor and returns the result
+    /// $`mO\widetilde{m}`$.
+    pub fn conj_origin(&self) -> Point {
+        Point::from(crate::arch::swo12(self.p1, self.p2))
+    }
 
-        /// Conjugates a direction $d$ with this motor and returns the result
-        /// $md\widetilde{m}$.
-        ///
-        /// The cost of this operation is the same as the application of a rotor due
-        /// to the translational invariance of directions (points at infinity).
-        [[nodiscard]] direction KLN_VEC_CALL operator()(direction const& d) const
-            noexcept
-        {
-            direction out;
-            detail::sw312<false, false>(&d.p3_, p1_, nullptr, &out.p3_);
-            return out;
-        }
+    /// Conjugates a direction $d$ with this motor and returns the result
+    /// $`md\widetilde{m}`$.
+    ///
+    /// The cost of this operation is the same as the application of a rotor due
+    /// to the translational invariance of directions (points at infinity).
+    pub fn conj_dir(&self, d: Direction) -> Direction {
+        use core::iter::once;
 
-        /// Conjugates an array of directions with this motor in the input array and
-        /// stores the result in the output array. Aliasing is only permitted when
-        /// `in == out` (in place motor application).
-        ///
-        /// The cost of this operation is the same as the application of a rotor due
-        /// to the translational invariance of directions (points at infinity).
-        ///
-        /// !!! tip
-        ///
-        ///     When applying a motor to a list of tightly packed directions, this
-        ///     routine will be *significantly faster* than applying the motor to
-        ///     each direction individually.
-        void KLN_VEC_CALL operator()(direction* in, direction* out, size_t count) const
-            noexcept
-        {
-            detail::sw312<true, false>(&in->p3_, p1_, nullptr, &out->p3_, count);
-        }
+        let mut out = Direction::new(0.0, 0.0, 0.0);
+        crate::arch::sw312(once(&d.p3), self.p1, None, once(&mut out.p3));
+        out
+    }
 
-    };
-    */
+    /// Conjugates an array of directions with this motor in the input array and
+    /// stores the result in the output array. Aliasing is only permitted when
+    /// `in == out` (in place motor application).
+    ///
+    /// The cost of this operation is the same as the application of a rotor due
+    /// to the translational invariance of directions (points at infinity).
+    ///
+    /// # tip
+    ///
+    /// When applying a motor to a list of tightly packed directions, this
+    /// routine will be *significantly faster* than applying the motor to
+    /// each direction individually.
+    pub fn conj_dirs(&self, input: &[Direction], output: &mut [Direction]) {
+        crate::arch::sw312(
+            input.iter().map(|d| &d.p3),
+            self.p1,
+            None,
+            output.iter_mut().map(|d| &mut d.p3),
+        )
+    }
 }

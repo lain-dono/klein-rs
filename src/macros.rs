@@ -178,7 +178,7 @@ macro_rules! derive_f32x4 {
             type Output = Self;
             #[inline(always)]
             fn div(self, s: f32) -> Self::Output {
-                Self { $($field: self.$field * s),+ }
+                Self { $($field: self.$field / s),+ }
             }
         }
     };

@@ -1,3 +1,5 @@
+#![allow(unused_doc_comments)]
+
 //! # Quick start
 //!
 //! Here's a simple snippet to get you started:
