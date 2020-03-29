@@ -48,7 +48,7 @@ impl Translator {
     pub fn conj_plane(&self, p: Plane) -> Plane {
         Plane::from(crate::arch::sw02(
             p.p0,
-            self.p2.blend1(f32x4::set_scalar(1.0)),
+            self.p2.blend1(f32x4::set0(1.0)),
         ))
     }
 

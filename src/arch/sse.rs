@@ -47,7 +47,7 @@ pub fn hi_dp_ss(a: f32x4, b: f32x4) -> f32x4 {
     let sum = hi + out;
 
     // unpacklo: 0 0 1 1
-    let out = sum + out.unpacklo();
+    let out = sum + out.unpack_low();
 
     // (1 + 2 + 3, _, _, _)
     out.movehl()
@@ -70,7 +70,7 @@ pub fn hi_dp(a: f32x4, b: f32x4) -> f32x4 {
         let sum = hi + out;
 
         // unpacklo: 0 0 1 1
-        let out = sum + out.unpacklo();
+        let out = sum + out.unpack_low();
 
         // (1 + 2 + 3, _, _, _)
         let out = out.movehl();
@@ -94,7 +94,7 @@ pub fn hi_dp_bc(a: f32x4, b: f32x4) -> f32x4 {
         let sum = hi + out;
 
         // unpacklo: 0 0 1 1
-        let out = sum + out.unpacklo();
+        let out = sum + out.unpack_low();
 
         shuffle!(out, [2, 2, 2, 2])
     }
@@ -112,7 +112,7 @@ pub fn dp(a: f32x4, b: f32x4) -> f32x4 {
         // (a1 b1, a2 b2, a3 b3, 0) + (a2 b2, a2 b2, 0, 0)
         // = (a1 b1 + a2 b2, _, a3 b3, 0)
         let out = hi + out;
-        let out = out.add_scalar(hi.movehl_ps(out));
+        let out = out.add0(hi.movehl_ps(out));
 
         out & f32x4::cast_i32(0, 0, 0, -1)
     }
@@ -130,7 +130,7 @@ pub fn dp_bc(a: f32x4, b: f32x4) -> f32x4 {
         // (a1 b1, a2 b2, a3 b3, 0) + (a2 b2, a2 b2, 0, 0)
         // = (a1 b1 + a2 b2, _, a3 b3, 0)
         let out = hi + out;
-        let out = out.add_scalar(hi.movehl_ps(out));
+        let out = out.add0(hi.movehl_ps(out));
 
         shuffle!(out, [0, 0, 0, 0])
     }

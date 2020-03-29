@@ -43,7 +43,7 @@ impl Plane {
     pub fn normalize(&mut self) {
         let inv_norm = f32x4::hi_dp_bc(self.p0, self.p0)
             .rsqrt_nr1()
-            .blend1(f32x4::set_scalar(1.0));
+            .blend1(f32x4::set0(1.0));
 
         self.p0 = inv_norm * self.p0;
     }
@@ -61,7 +61,7 @@ impl Plane {
     /// $P\vee\ell$ containing both $\ell$ and $P$ will have a norm equivalent
     /// to the distance between $P$ and $\ell$.
     pub fn norm(self) -> f32 {
-        f32x4::hi_dp(self.p0, self.p0).sqrt_nr1().first()
+        f32x4::hi_dp(self.p0, self.p0).sqrt_nr1().extract0()
     }
 
     pub fn invert(&mut self) {

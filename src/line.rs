@@ -18,7 +18,7 @@ impl IdealLine {
     }
 
     pub fn squared_ideal_norm(self) -> f32 {
-        f32x4::hi_dp(self.p2, self.p2).first()
+        f32x4::hi_dp(self.p2, self.p2).extract0()
     }
 
     /// Reversion operator
@@ -85,7 +85,7 @@ impl Branch {
     ///
     /// Returns `d^2 + e^2 + f^2`.
     pub fn squared_norm(self) -> f32 {
-        f32x4::hi_dp(self.p1, self.p1).first()
+        f32x4::hi_dp(self.p1, self.p1).extract0()
     }
 
     pub fn normalize(&mut self) {
@@ -161,24 +161,6 @@ impl Line {
         }
     }
 
-    /*
-    pub fn store1(self) -> [f32; 4] {
-        unsafe {
-            let mut out = [0.0; 4];
-            _mm_store_ps(out.as_mut_ptr(), self.p1);
-            out
-        }
-    }
-
-    pub fn store2(self) -> [f32; 4] {
-        unsafe {
-            let mut out = [0.0; 4];
-            _mm_store_ps(out.as_mut_ptr(), self.p2);
-            out
-        }
-    }
-    */
-
     /// Returns the square root of the quantity produced by
     /// `squared_norm`.
     pub fn norm(self) -> f32 {
@@ -190,7 +172,7 @@ impl Line {
     /// distance between the two points (provided the points are
     /// normalized). Returns $d^2 + e^2 + f^2$.
     pub fn squared_norm(self) -> f32 {
-        f32x4::hi_dp(self.p1, self.p1).first()
+        f32x4::hi_dp(self.p1, self.p1).extract0()
     }
 
     /// Normalize a line such that $\ell^2 = -1$.
@@ -219,24 +201,22 @@ impl Line {
     }
 
     pub fn invert(&mut self) {
-        unsafe {
-            // s, t computed as in the normalization
-            let b2 = f32x4::hi_dp_bc(self.p1, self.p1);
-            let s = b2.rsqrt_nr1();
-            let bc = f32x4::hi_dp_bc(self.p1, self.p2);
-            let b2_inv = b2.rcp_nr1();
-            let t = bc * b2_inv * s;
-            let neg = f32x4::new(-0.0, -0.0, -0.0, 0.0);
+        // s, t computed as in the normalization
+        let b2 = f32x4::hi_dp_bc(self.p1, self.p1);
+        let s = b2.rsqrt_nr1();
+        let bc = f32x4::hi_dp_bc(self.p1, self.p2);
+        let b2_inv = b2.rcp_nr1();
+        let t = bc * b2_inv * s;
+        let neg = f32x4::new(-0.0, -0.0, -0.0, 0.0);
 
-            // p1 * (s + t e0123)^2 = (s * p1 - t p1_perp) * (s + t e0123)
-            // = s^2 p1 - s t p1_perp - s t p1_perp
-            // = s^2 p1 - 2 s t p1_perp
-            // p2 * (s + t e0123)^2 = s^2 p2
-            // NOTE: s^2 = b2_inv
-            let st = self.p1 * s * t;
-            self.p2 = (self.p2 * b2_inv - (st + st)) ^ neg;
-            self.p1 = (self.p1 * b2_inv) ^ neg;
-        }
+        // p1 * (s + t e0123)^2 = (s * p1 - t p1_perp) * (s + t e0123)
+        // = s^2 p1 - s t p1_perp - s t p1_perp
+        // = s^2 p1 - 2 s t p1_perp
+        // p2 * (s + t e0123)^2 = s^2 p2
+        // NOTE: s^2 = b2_inv
+        let st = self.p1 * s * t;
+        self.p2 = (self.p2 * b2_inv - (st + st)) ^ neg;
+        self.p1 = (self.p1 * b2_inv) ^ neg;
     }
 
     pub fn inverse(mut self) -> Self {
@@ -255,25 +235,11 @@ impl Line {
         self
     }
 
-    /*
     pub fn line_eq(self, other: Self) -> bool {
-        unsafe {
-            let p1_eq = _mm_cmpeq_ps(self.p1, other.p1);
-            let p2_eq = _mm_cmpeq_ps(self.p2, other.p2);
-            let eq = _mm_and_ps(p1_eq, p2_eq);
-            _mm_movemask_ps(eq) == 0x0F
-        }
+        f32x4::bit_eq_pair(self.into(), other.into())
     }
 
-    pub fn line_approx_eq(self, other: Self, epsilon: f32) -> bool {
-        unsafe {
-            let eps = _mm_set1_ps(epsilon);
-            let neg = _mm_set1_ps(-0.0);
-            let cmp1 = _mm_cmplt_ps(_mm_andnot_ps(neg, _mm_sub_ps(self.p1, other.p1)), eps);
-            let cmp2 = _mm_cmplt_ps(_mm_andnot_ps(neg, _mm_sub_ps(self.p2, other.p2)), eps);
-            let cmp = _mm_and_ps(cmp1, cmp2);
-            _mm_movemask_ps(cmp) == 0x0F
-        }
+    pub fn approx_eq(self, other: Self, epsilon: f32) -> bool {
+        f32x4::approx_eq_pair(self.into(), other.into(), epsilon)
     }
-    */
 }

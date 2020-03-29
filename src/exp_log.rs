@@ -48,16 +48,16 @@ impl Branch {
         let p1 = self.p1;
 
         // Compute the rotor angle
-        let ang = f32x4::hi_dp(p1, p1).sqrt_nr1().first();
+        let ang = f32x4::hi_dp(p1, p1).sqrt_nr1().extract0();
         let (sin, cos) = ang.sin_cos();
 
-        let p1 = f32x4::all(sin / ang) * p1 + f32x4::set_scalar(cos);
+        let p1 = f32x4::all(sin / ang) * p1 + f32x4::set0(cos);
         Rotor { p1 }
     }
 
     #[inline]
     pub fn sqrt(self) -> Rotor {
-        let p1 = self.p1.add_scalar(f32x4::set_scalar(1.0));
+        let p1 = self.p1.add0(f32x4::set0(1.0));
         Rotor { p1 }.normalized()
     }
 }
@@ -75,23 +75,19 @@ impl Rotor {
     #[inline]
     pub fn log(self) -> Branch {
         let p1 = self.p1;
-        let ang = p1.first().acos();
+        let ang = p1.extract0().acos();
         let sin = f32x4::all(ang.sin());
 
         let p1 = p1 * sin.rcp_nr1() * f32x4::all(ang);
+        let p1 = p1.blend_and();
 
-        let p1 = if cfg!(target_feature = "sse4.1") {
-            p1.blend1(f32x4::zero())
-        } else {
-            p1 & f32x4::cast_i32(-1, -1, -1, 0)
-        };
         Branch { p1 }
     }
 
     /// Compute the square root of the provided rotor.
     #[inline]
     pub fn sqrt(self) -> Self {
-        Self::from(self.p1.add_scalar(f32x4::set_scalar(1.0))).normalized()
+        Self::from(self.p1.add0(f32x4::set0(1.0))).normalized()
     }
 }
 
@@ -104,7 +100,7 @@ impl Motor {
     /// Compute the square root of the provided motor.
     #[inline]
     pub fn sqrt(mut self) -> Self {
-        self.p1 = self.p1.add_scalar(f32x4::set_scalar(1.0));
+        self.p1 = self.p1.add0(f32x4::set0(1.0));
         self.normalized()
     }
 }
@@ -194,17 +190,17 @@ pub fn exp(a: f32x4, b: f32x4) -> (f32x4, f32x4) {
     //
     // where we've used the fact that n is normalized and squares to -1.
     // Note the v here corresponds to minus_v
-    let uv: [f32; 2] = [u.first(), minus_v.first()];
+    let uv: [f32; 2] = [u.extract0(), minus_v.extract0()];
 
     let (sin, cos) = uv[0].sin_cos();
 
     let sinu = f32x4::all(sin);
-    let p1 = f32x4::set_scalar(cos) + sinu * norm_real;
+    let p1 = f32x4::set0(cos) + sinu * norm_real;
 
     // The second partition has contributions from both the real and ideal parts.
     let cosu = f32x4::new(cos, cos, cos, 0.0);
     let minus_vcosu = minus_v * cosu;
-    let p2 = f32x4::set_scalar(uv[1] * sin) + sinu * norm_ideal + minus_vcosu * norm_real;
+    let p2 = f32x4::set0(uv[1] * sin) + sinu * norm_ideal + minus_vcosu * norm_real;
 
     (p1, p2)
 }
@@ -232,15 +228,15 @@ pub fn log(p1: f32x4, p2: f32x4) -> (f32x4, f32x4) {
     // TODO: handle case when a2 is 0
     let ab = f32x4::hi_dp_bc(a, b);
     let a2_sqrt_rcp = a2.rsqrt_nr1();
-    let s_scalar = (a2 * a2_sqrt_rcp).first();
-    let t_scalar = (ab * a2_sqrt_rcp).first() * -1.0;
+    let s_scalar = (a2 * a2_sqrt_rcp).extract0();
+    let t_scalar = (ab * a2_sqrt_rcp).extract0() * -1.0;
     // s + t e0123 is the norm of our bivector.
 
     // Store the scalar component
-    let p_scalar = p1.first();
+    let p_scalar = p1.extract0();
 
     // Store the pseudoscalar component
-    let q_scalar = p2.first();
+    let q_scalar = p2.extract0();
 
     // p = cosu
     // q = -v sinu

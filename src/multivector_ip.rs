@@ -15,11 +15,11 @@ macro_rules! impl_dot {
     };
 }
 
-impl_dot!(|a: Plane, b: Plane| -> f32 { f32x4::hi_dp(a.p0, b.p0).first() });
-impl_dot!(|a: Line, b: Line| -> f32 { (f32x4::all(-0.0) ^ f32x4::hi_dp_ss(a.p1, b.p1)).first() });
+impl_dot!(|a: Plane, b: Plane| -> f32 { f32x4::hi_dp(a.p0, b.p0).extract0() });
+impl_dot!(|a: Line, b: Line| -> f32 { (f32x4::all(-0.0) ^ f32x4::hi_dp_ss(a.p1, b.p1)).extract0() });
 impl_dot!(|a: Point, b: Point| -> f32 {
     // -a0 b0
-    (f32x4::all(-1.0) * (a.p3 * b.p3)).first()
+    (f32x4::all(-1.0) * (a.p3 * b.p3)).extract0()
 });
 
 impl_dot!(|a: Plane, b: Line| -> Plane {
@@ -30,7 +30,7 @@ impl_dot!(|a: Plane, b: Line| -> Plane {
 
     let p0 = shuffle!(a.p0, [1, 3, 2, 0]) * b.p1;
     let p0 = p0 - a.p0 * shuffle!(b.p1, [1, 3, 2, 0]);
-    let p0 = shuffle!(p0, [1, 3, 2, 0]).sub_scalar(f32x4::hi_dp_ss(a.p0, b.p2));
+    let p0 = shuffle!(p0, [1, 3, 2, 0]).sub0(f32x4::hi_dp_ss(a.p0, b.p2));
 
     Plane::from(p0)
 });
@@ -43,7 +43,7 @@ impl_dot!(|b: Line, a: Plane| -> Plane {
 
     let p0 = a.p0 * shuffle!(b.p1, [1, 3, 2, 0]);
     let p0 = p0 - b.p1 * shuffle!(a.p0, [1, 3, 2, 0]);
-    let p0 = shuffle!(p0, [1, 3, 2, 0]).add_scalar(f32x4::hi_dp_ss(a.p0, b.p2));
+    let p0 = shuffle!(p0, [1, 3, 2, 0]).add0(f32x4::hi_dp_ss(a.p0, b.p2));
 
     Plane::from(p0)
 });

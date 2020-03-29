@@ -56,9 +56,8 @@ fn reflect_point() {
 }
 
 #[test]
-#[ignore]
+//#[ignore]
 fn rotor_line() {
-    /*
     // Make an unnormalized rotor to verify correctness
     let p1 = f32x4::from_array([1.0, 4.0, -3.0, 2.0]);
     let r = Rotor::from(p1);
@@ -71,7 +70,6 @@ fn rotor_line() {
     assert_eq!(l2.e12(), -240.0);
     assert_eq!(l2.e31(), 102.0);
     assert_eq!(l2.e23(), -36.0);
-    */
 }
 
 #[test]
@@ -111,33 +109,30 @@ fn translator_line() {
 }
 
 #[test]
-#[ignore]
 fn construct_motor() {
-    /*
-    rotor r{M_PI * 0.5f, 0, 0, 1.0};
-    translator t{1.0, 0.0, 0.0, 1.0};
-    motor m = r * t;
-    point p1{1, 0, 0};
-    point p2 = m(p1);
+    let  r = Rotor::new (FRAC_PI_2, 0.0, 0.0, 1.0);
+    let t = Translator::new (1.0, 0.0, 0.0, 1.0);
+    let m: Motor  = r * t;
+    let p1 = Point::new (1.0, 0.0, 0.0);
+    let p2 = m.conj_point(p1);
     assert_eq!(p2.x(), 0.0);
     abs_diff_eq!(p2.y(), 1.0);
     abs_diff_eq!(p2.z(), 1.0);
 
     // Rotation and translation about the same axis commutes
     let m  = t * r;
-    let p2 = m(p1);
+    let p2 = m.conj_point(p1);
     assert_eq!(p2.x(), 0.0);
     abs_diff_eq!(p2.y(), 1.0);
     abs_diff_eq!(p2.z(), 1.0);
 
     let l: Line  = m.log();
     assert_eq!(l.e23(), 0.0);
-    assert_eq!(l.e12(), doctest::Approx(-0.7854).epsilon(0.001));
+    abs_diff_eq!(l.e12(), -0.7854, epsilon = 0.001);
     assert_eq!(l.e31(), 0.0);
     assert_eq!(l.e01(), 0.0);
     assert_eq!(l.e02(), 0.0);
-    assert_eq!(l.e03(), doctest::Approx(-0.5));
-    */
+    abs_diff_eq!(l.e03(), -0.5);
 }
 
 #[test]
@@ -212,20 +207,18 @@ fn motor_point_variadic() {
 }
 
 #[test]
-#[ignore]
+//#[ignore]
 fn motor_line() {
-    /*
-    motor m{2.0, 4.0, 3.0, -1.0, -5.0, -2.0, 2.0, -3.0};
+    let m = Motor::new (2.0, 4.0, 3.0, -1.0, -5.0, -2.0, 2.0, -3.0);
     // a*e01 + b*e01 + c*e02 + d*e23 + e*e31 + f*e12
-    line l1{-1.0, 2.0, -3.0, -6.0, 5.0, 4.0};
-    line l2{m(l1)};
+    let l1 = Line::new (-1.0, 2.0, -3.0, -6.0, 5.0, 4.0);
+    let l2 = m.conj_line(l1);
     assert_eq!(l2.e01(), 6.0);
     assert_eq!(l2.e02(), 522.0);
     assert_eq!(l2.e03(), 96.0);
     assert_eq!(l2.e12(), -214.0);
     assert_eq!(l2.e31(), -148.0);
     assert_eq!(l2.e23(), -40.0);
-    */
 }
 
 #[test]
@@ -300,7 +293,6 @@ fn motor_to_matrix3x4() {
 }
 
 #[test]
-#[ignore]
 fn normalize_motor() {
     let m = Motor::new(1.0, 4.0, 3.0, 2.0, 5.0, 6.0, 7.0, 8.0);
     let m = m.normalized();

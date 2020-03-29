@@ -36,10 +36,10 @@ pub fn sw00(a: f32x4, b: f32x4) -> f32x4 {
 
     // Left block
     let left = a_zzwy * shuffle!(b, [1, 3, 2, 2]) + a_wwyz * shuffle!(b, [2, 1, 3, 3]);
-    let left = left.add_scalar(a.movehdup().mul_scalar(b.movehdup())) * (a + a);
+    let left = left.add0(a.movehdup().mul0(b.movehdup())) * (a + a);
 
     // Right block
-    let right = (a_yyzw * a_yyzw) ^ f32x4::set_scalar(-0.0);
+    let right = (a_yyzw * a_yyzw) ^ f32x4::set0(-0.0);
     let right = right - a_zzwy * a_zzwy - a_wwyz * a_wwyz;
 
     left + right * b
@@ -64,7 +64,7 @@ pub fn sw10(a: f32x4, b: f32x4) -> (f32x4, f32x4) {
 
     let two_zero = f32x4::new(2.0, 2.0, 2.0, 0.0);
 
-    let p1 = (a_zyzw * a_zyzw + a_wzwy * a_wzwy) ^ f32x4::set_scalar(-0.0);
+    let p1 = (a_zyzw * a_zyzw + a_wzwy * a_wzwy) ^ f32x4::set0(-0.0);
     let p1 = (a_ywyz * a_ywyz - p1) * shuffle!(b, [2, 1, 3, 0]);
     let p1 = (a * b + a_wzwy * b_xzwy) * a_ywyz * two_zero + p1;
     let p1 = shuffle!(p1, [1, 3, 2, 0]);
@@ -91,7 +91,7 @@ pub fn sw20(a: f32x4, b: f32x4) -> f32x4 {
 
     let a_yyzw = shuffle!(a, [3, 2, 1, 1]);
     let tmp = a_yyzw * a_yyzw;
-    let tmp = f32x4::set_scalar(-0.0) ^ (tmp + a_zzwy * a_zzwy);
+    let tmp = f32x4::set0(-0.0) ^ (tmp + a_zzwy * a_zzwy);
     let tmp = tmp - a_wwyz * a_wwyz;
     let p2 = p2 + tmp * shuffle!(b, [2, 1, 3, 0]);
     shuffle!(p2, [1, 3, 2, 0])
@@ -113,7 +113,7 @@ pub fn sw30(a: f32x4, b: f32x4) -> f32x4 {
     let p3 = p3 + a_zwyz * shuffle!(b, [2, 1, 3, 0]) + a_yzwy * shuffle!(b, [1, 3, 2, 0]);
     let p3 = p3 * a * f32x4::new(-2.0, -2.0, -2.0, 0.0);
 
-    p3 + b * (a_yzwy * a_yzwy + a_zwyz * a_zwyz - ((a_wyzw * a_wyzw) ^ f32x4::set_scalar(-0.0)))
+    p3 + b * (a_yzwy * a_yzwy + a_zwyz * a_zwyz - ((a_wyzw * a_wyzw) ^ f32x4::set0(-0.0)))
 }
 
 // Apply a translator to a plane.
@@ -148,8 +148,8 @@ pub fn sw02(a: f32x4, b: f32x4) -> f32x4 {
     // Add to the plane
 
     let inv_b = b.rcp_nr1();
-    let inv_b = inv_b.add_scalar(inv_b) & f32x4::cast_i32(0, 0, 0, -1);
-    a + f32x4::hi_dp(a, b).mul_scalar(inv_b)
+    let inv_b = inv_b.add0(inv_b) & f32x4::cast_i32(0, 0, 0, -1);
+    a + f32x4::hi_dp(a, b).mul0(inv_b)
 }
 
 // Apply a translator to a line
@@ -175,7 +175,7 @@ pub fn sw_l2(a: f32x4, d: f32x4, c: f32x4) -> (f32x4, f32x4) {
     // Add and subtract the same quantity in the low component to produce a
     // cancellation
     let p2 = p2 - shuffle!(a, [2, 1, 3, 0]) * shuffle!(c, [1, 3, 2, 0]);
-    let p2 = p2 - ((a * shuffle!(c, [0, 0, 0, 0])) ^ f32x4::set_scalar(-0.0));
+    let p2 = p2 - ((a * shuffle!(c, [0, 0, 0, 0])) ^ f32x4::set0(-0.0));
     let p2 = p2 + p2 + d;
 
     (p1, p2)
@@ -203,11 +203,7 @@ pub fn sw32(a: f32x4, b: f32x4) -> f32x4 {
 // Note: in and out are permitted to alias iff a == out.
 
 //template <bool Variadic, bool Translate, bool InputP2>
-pub fn sw_mm1<'a>(
-    input: impl Iterator<Item = &'a f32x4>,
-    b: f32x4,
-    output: impl Iterator<Item = &'a mut f32x4>,
-) {
+pub fn sw_mm11(input: impl Iterator<Item = f32x4>, b: f32x4) -> impl Iterator<Item = f32x4> {
     // p1 block
     // a0(b0^2 + b1^2 + b2^2 + b3^2) +
     // (a1(b1^2 + b0^2 - b3^2 - b2^2) +
@@ -222,14 +218,11 @@ pub fn sw_mm1<'a>(
     let b_yxxx = shuffle!(b, [0, 0, 0, 1]);
     let b_yxxx_2 = b_yxxx * b_yxxx;
 
-    let tmp = b * b + b_yxxx_2;
-
     let b_tmp = shuffle!(b, [2, 1, 3, 2]);
-    let tmp2 = b_tmp * b_tmp;
-
+    let b_tmp2 = b_tmp * b_tmp;
     let b_tmp = shuffle!(b, [1, 3, 2, 3]);
-    let tmp2 = tmp2 + b_tmp * b_tmp;
-    let tmp = tmp - (tmp2 ^ f32x4::all(-0.0));
+    let b_tmp2 = b_tmp2 + b_tmp * b_tmp;
+    let tmp = b * b + b_yxxx_2 - (b_tmp2 ^ f32x4::set0(-0.0));
     // tmp needs to be scaled by a and set to p1_out
 
     let b_xxxx = shuffle!(b, [0, 0, 0, 0]);
@@ -267,24 +260,18 @@ pub fn sw_mm1<'a>(
     //  d3(b0^2 + b3^2 - b2^2 - b1^2)) e03
 
     // Rotation
-
-    // tmp scaled by d and added to p2
-    // tmp2 scaled by (d0, d2, d3, d1) and added to p2
-    // tmp3 scaled by (d0, d3, d1, d2) and added to p2
-
-    for (&p1_in, p1_out) in input.zip(output) {
-        let p1_in_xzwy = shuffle!(p1_in, [1, 3, 2, 0]);
-        let p1_in_xwyz = shuffle!(p1_in, [2, 1, 3, 0]);
-
-        *p1_out = tmp * p1_in + tmp2 * p1_in_xzwy + tmp3 * p1_in_xwyz;
-    }
+    input.map(move |p1| {
+        let p1_xzwy = shuffle!(p1, [1, 3, 2, 0]);
+        let p1_xwyz = shuffle!(p1, [2, 1, 3, 0]);
+        tmp * p1 + tmp2 * p1_xzwy + tmp3 * p1_xwyz
+    })
 }
 
 pub fn sw_mm22<'a>(
-    input: impl Iterator<Item = &'a (f32x4, f32x4)>,
+    input: impl Iterator<Item = (&'a f32x4, &'a f32x4)>,
     b: f32x4,
     c: Option<&'a f32x4>,
-    output: impl Iterator<Item = &'a mut (f32x4, f32x4)>,
+    output: impl Iterator<Item = (&'a mut f32x4, &'a mut f32x4)>,
 ) {
     // p1 block
     // a0(b0^2 + b1^2 + b2^2 + b3^2) +
@@ -300,14 +287,11 @@ pub fn sw_mm22<'a>(
     let b_yxxx = shuffle!(b, [0, 0, 0, 1]);
     let b_yxxx_2 = b_yxxx * b_yxxx;
 
-    let tmp = b * b + b_yxxx_2;
-
     let b_tmp = shuffle!(b, [2, 1, 3, 2]);
-    let tmp2 = b_tmp * b_tmp;
-
+    let b_tmp2 = b_tmp * b_tmp;
     let b_tmp = shuffle!(b, [1, 3, 2, 3]);
-    let tmp2 = tmp2 + b_tmp * b_tmp;
-    let tmp = tmp - (tmp2 ^ f32x4::all(-0.0));
+    let b_tmp2 = b_tmp2 + b_tmp * b_tmp;
+    let tmp = b * b + b_yxxx_2 - (b_tmp2 ^ f32x4::set0(-0.0));
     // tmp needs to be scaled by a and set to p1_out
 
     let b_xxxx = shuffle!(b, [0, 0, 0, 0]);
@@ -362,7 +346,8 @@ pub fn sw_mm22<'a>(
         let c_xzwy = shuffle!(c, [1, 3, 2, 0]);
         let c_xwyz = shuffle!(c, [2, 1, 3, 0]);
 
-        let tmp4 = b * c - b_yxxx * shuffle!(c, [0, 0, 0, 1]);
+        let tmp4 = b * c;
+        let tmp4 = tmp4 - b_yxxx * shuffle!(c, [0, 0, 0, 1]);
         let tmp4 = tmp4 - shuffle!(b, [1, 3, 3, 2]) * shuffle!(c, [1, 3, 3, 2]);
         let tmp4 = tmp4 - shuffle!(b, [2, 1, 2, 3]) * shuffle!(c, [2, 1, 2, 3]);
         let tmp4 = tmp4 + tmp4;
@@ -375,17 +360,16 @@ pub fn sw_mm22<'a>(
         unsafe { core::mem::uninitialized() }
     };
 
-    for (input, output) in input.zip(output) {
-        let (p1_in, p2_in) = (input.0, input.1);
-        let (p1_out, p2_out) = (&mut output.0, &mut output.1);
+    for ((&p1_in, &p2_in), output) in input.zip(output) {
+        let (p1_out, p2_out) = (output.0, output.1);
 
         let p1_in_xzwy = shuffle!(p1_in, [1, 3, 2, 0]);
         let p1_in_xwyz = shuffle!(p1_in, [2, 1, 3, 0]);
 
-        let p2_in_xzwy = shuffle!(p1_in, [1, 3, 2, 0]);
-        let p2_in_xwyz = shuffle!(p1_in, [2, 1, 3, 0]);
+        let p2_in_xzwy = shuffle!(p2_in, [1, 3, 2, 0]);
+        let p2_in_xwyz = shuffle!(p2_in, [2, 1, 3, 0]);
 
-        *p1_out = p1_in * tmp + tmp2 * p1_in_xzwy + tmp3 * p1_in_xwyz;
+        *p1_out = tmp * p1_in + tmp2 * p1_in_xzwy + tmp3 * p1_in_xwyz;
         *p2_out = tmp * p2_in + tmp2 * p2_in_xzwy + tmp3 * p2_in_xwyz;
 
         // If what is being applied is a rotor, the non-directional
@@ -614,5 +598,5 @@ pub fn swo12(b: f32x4, c: f32x4) -> f32x4 {
 
     // b0^2 + b1^2 + b2^2 + b3^2 assumed to equal 1
     // Set the low component to unity
-    tmp + f32x4::set_scalar(1.0)
+    tmp + f32x4::set0(1.0)
 }

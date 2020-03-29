@@ -48,28 +48,28 @@ impl_meet!(|a: Plane, b: Point| -> Dual {
     // (a0 b0 + a1 b1 + a2 b2 + a3 b3) e0123
     Dual {
         p: 0.0,
-        q: f32x4::dp(a.p0, b.p3).first(),
+        q: f32x4::dp(a.p0, b.p3).extract0(),
     }
 });
 impl_meet!(|b: Point, a: Plane| -> Dual {
     // p0 ^ p3 = -p3 ^ p0
     Dual {
         p: 0.0,
-        q: (f32x4::dp(a.p0, b.p3) ^ f32x4::all(-0.0)).first(),
+        q: (f32x4::dp(a.p0, b.p3) ^ f32x4::all(-0.0)).extract0(),
     }
 });
 
 impl_meet!(|a: Branch, b: IdealLine| -> Dual {
     Dual {
         p: 0.0,
-        q: f32x4::hi_dp_ss(a.p1, b.p2).first(),
+        q: f32x4::hi_dp_ss(a.p1, b.p2).extract0(),
     }
 });
 impl_meet!(|b: IdealLine, a: Branch| -> Dual { a ^ b });
 
 impl_meet!(|a: Line, b: Line| -> Dual {
-    let x = f32x4::hi_dp_ss(a.p1, b.p2).first();
-    let y = f32x4::hi_dp_ss(b.p1, a.p2).first();
+    let x = f32x4::hi_dp_ss(a.p1, b.p2).extract0();
+    let y = f32x4::hi_dp_ss(b.p1, a.p2).extract0();
     Dual { p: 0.0, q: x + y }
 });
 

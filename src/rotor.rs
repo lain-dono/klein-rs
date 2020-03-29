@@ -1,4 +1,4 @@
-use crate::{arch::f32x4, Branch, Direction, Plane, Point};
+use crate::{arch::f32x4, Branch, Direction, Line, Plane, Point};
 
 #[derive(Clone, Copy)]
 pub struct Rotor {
@@ -68,7 +68,7 @@ impl Rotor {
 
     /// Constrains the rotor to traverse the shortest arc
     pub fn constrain(&mut self) {
-        let mask = shuffle!(self.p1 & f32x4::set_scalar(-0.0), [0, 0, 0, 0]);
+        let mask = shuffle!(self.p1 & f32x4::set0(-0.0), [0, 0, 0, 0]);
         self.p1 = mask ^ self.p1;
     }
 
@@ -118,12 +118,10 @@ impl Rotor {
     /// $rp\widetilde{r}$.
     pub fn conj_plane(&self, p: &Plane) -> Plane {
         // NOTE: Conjugation of a plane and point with a rotor is identical
-        unsafe {
-            use core::iter::once;
-            let mut out: Plane = core::mem::uninitialized();
-            crate::arch::sw012(once(&p.p0), self.p1, None, once(&mut out.p0));
-            out
-        }
+        use core::iter::once;
+        let mut out: Plane = unsafe { core::mem::uninitialized() };
+        crate::arch::sw012(once(&p.p0), self.p1, None, once(&mut out.p0));
+        out
     }
 
     /// Conjugates an array of planes with this rotor in the input array and
@@ -137,34 +135,37 @@ impl Rotor {
     /// each plane individually.
     pub fn conj_plane_slice(&self, input: &[Plane], out: &mut [Plane]) {
         // NOTE: Conjugation of a plane and point with a rotor is identical
-        unsafe {
-            crate::arch::sw012(
-                input.iter().map(|d| &d.p0),
-                self.p1,
-                None,
-                out.iter_mut().map(|d| &mut d.p0),
-            )
-        }
+        crate::arch::sw012(
+            input.iter().map(|d| &d.p0),
+            self.p1,
+            None,
+            out.iter_mut().map(|d| &mut d.p0),
+        )
     }
 
     pub fn conj_branch(&self, b: Branch) -> Branch {
         use core::iter::once;
+        let p1 = crate::arch::sw_mm11(once(b.p1), self.p1).next().unwrap();
+        Branch { p1 }
+    }
 
-        let mut out: Branch = unsafe { core::mem::uninitialized() };
-        crate::arch::sw_mm1(once(&b.p1), self.p1, once(&mut out.p1));
-        out
+    /// Conjugates a line $\ell$ with this rotor and returns the result
+    /// $`r\ell \widetilde{r}`$.
+    pub fn conj_line(&self, l: Line) -> Line {
+        use core::iter::once;
+        unsafe {
+            let mut out: Line = unsafe { core::mem::uninitialized() };
+            crate::arch::sw_mm22(
+                once((&l.p1, &l.p2)),
+                self.p1,
+                None,
+                once((&mut out.p1, &mut out.p2)),
+            );
+            out
+        }
     }
 
     /*
-    /// Conjugates a line $\ell$ with this rotor and returns the result
-    /// $r\ell \widetilde{r}$.
-    [[nodiscard]] line KLN_VEC_CALL operator()(line const& l) const noexcept
-    {
-        line out;
-        detail::swMM<false, false, true>(&l.p1_, p1_, nullptr, &out.p1_);
-        return out;
-    }
-
     /// Conjugates an array of lines with this rotor in the input array and
     /// stores the result in the output array. Aliasing is only permitted when
     /// `in == out` (in place rotor application).
@@ -201,26 +202,22 @@ impl Rotor {
     /// each point individually.
     pub fn conj_point_slice(&self, input: &[Point], out: &mut [Point]) {
         // NOTE: Conjugation of a plane and point with a rotor is identical
-        unsafe {
-            crate::arch::sw012(
-                input.iter().map(|d| &d.p3),
-                self.p1,
-                None,
-                out.iter_mut().map(|d| &mut d.p3),
-            );
-        }
+        crate::arch::sw012(
+            input.iter().map(|d| &d.p3),
+            self.p1,
+            None,
+            out.iter_mut().map(|d| &mut d.p3),
+        );
     }
 
     /// Conjugates a direction `d` with this rotor and returns the result
     /// $rd\widetilde{r}$.
     pub fn conj_dir(&self, d: &Direction) -> Direction {
-        unsafe {
-            use core::iter::once;
-            let mut out: Direction = core::mem::uninitialized();
-            // NOTE: Conjugation of a plane and point with a rotor is identical
-            crate::arch::sw012(once(&d.p3), self.p1, None, once(&mut out.p3));
-            out
-        }
+        use core::iter::once;
+        let mut out: Direction = unsafe { core::mem::uninitialized() };
+        // NOTE: Conjugation of a plane and point with a rotor is identical
+        crate::arch::sw012(once(&d.p3), self.p1, None, once(&mut out.p3));
+        out
     }
 
     /// Conjugates an array of directions with this rotor in the input array and
@@ -234,13 +231,11 @@ impl Rotor {
     /// each direction individually.
     pub fn conj_dir_slice(&self, input: &[Direction], out: &mut [Direction]) {
         // NOTE: Conjugation of a plane and point with a rotor is identical
-        unsafe {
-            crate::arch::sw012(
-                input.iter().map(|d| &d.p3),
-                self.p1,
-                None,
-                out.iter_mut().map(|d| &mut d.p3),
-            )
-        }
+        crate::arch::sw012(
+            input.iter().map(|d| &d.p3),
+            self.p1,
+            None,
+            out.iter_mut().map(|d| &mut d.p3),
+        )
     }
 }

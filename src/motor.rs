@@ -49,7 +49,7 @@ impl Motor {
 
     pub fn from_translator(t: Translator) -> Self {
         Self {
-            p1: f32x4::set_scalar(1.0),
+            p1: f32x4::set0(1.0),
             p2: t.p2,
         }
     }
@@ -82,7 +82,7 @@ impl Motor {
         // normalized motor.
         let b2 = f32x4::dp_bc(self.p1, self.p1);
         let s = b2.rsqrt_nr1();
-        let bc = f32x4::dp_bc(self.p1 ^ f32x4::set_scalar(-0.0), self.p2);
+        let bc = f32x4::dp_bc(self.p1 ^ f32x4::set0(-0.0), self.p2);
         let t = bc * b2.rcp_nr1() * s;
 
         // (s + t e0123) * motor =
@@ -96,7 +96,7 @@ impl Motor {
         // (s c2 - t b2) e02 +
         // (s c3 - t b3) e03
 
-        self.p2 = self.p2 * s - ((self.p1 * t) ^ f32x4::set_scalar(-0.0));
+        self.p2 = self.p2 * s - ((self.p1 * t) ^ f32x4::set0(-0.0));
         self.p1 = self.p1 * s;
     }
 
@@ -110,7 +110,7 @@ impl Motor {
         // s, t computed as in the normalization
         let b2 = f32x4::dp_bc(self.p1, self.p1);
         let s = b2.rsqrt_nr1();
-        let bc = f32x4::dp_bc(self.p1 ^ f32x4::set_scalar(-0.0), self.p2);
+        let bc = f32x4::dp_bc(self.p1 ^ f32x4::set0(-0.0), self.p2);
         let b2_inv = b2.rcp_nr1();
         let t = bc * b2_inv * s;
         let neg = f32x4::new(-0.0, -0.0, -0.0, 0.0);
@@ -121,7 +121,7 @@ impl Motor {
         // (the scalar component above needs to be negated)
         // p2 * (s + t e0123)^2 = s^2 p2 NOTE: s^2 = b2_inv
         let st = self.p1 * s * t;
-        self.p2 = (self.p2 * b2_inv) - ((st + st) ^ f32x4::set_scalar(-0.0));
+        self.p2 = (self.p2 * b2_inv) - ((st + st) ^ f32x4::set0(-0.0));
         self.p2 = self.p2 ^ neg;
 
         self.p1 = (self.p1 * b2_inv) ^ neg;
@@ -134,7 +134,7 @@ impl Motor {
 
     /// Constrains the motor to traverse the shortest arc
     pub fn constrain(&mut self) {
-        let mask = shuffle!(self.p1 & f32x4::set_scalar(-0.0), [0, 0, 0, 0]);
+        let mask = shuffle!(self.p1 & f32x4::set0(-0.0), [0, 0, 0, 0]);
         self.p1 = mask ^ self.p1;
         self.p2 = mask ^ self.p2;
     }
@@ -218,16 +218,21 @@ impl Motor {
         }
     }
 
-    /*
-    /// Conjugates a line $\ell$ with this motor and returns the result
-    /// $m\ell \widetilde{m}$.
-    [[nodiscard]] line KLN_VEC_CALL operator()(line const& l) const noexcept
-    {
-        line out;
-        detail::swMM<false, true, true>(&l.p1_, p1_, &p2_, &out.p1_);
-        return out;
+    /// Conjugates a line $`\ell`$ with this motor and returns the result
+    /// $`m\ell \widetilde{m}`$.
+    pub fn conj_line(&self, l: Line) -> Line {
+        use core::iter::once;
+        unsafe {
+            let mut out: Line = unsafe { core::mem::uninitialized() };
+            crate::arch::sw_mm22(
+                once((&l.p1, &l.p2)),
+                self.p1,
+                Some(&self.p2),
+                once((&mut out.p1, &mut out.p2)),
+            );
+            out
+        }
     }
-    */
 
     /*
     /// Conjugates an array of lines with this motor in the input array and

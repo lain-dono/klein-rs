@@ -12,7 +12,7 @@ impl Origin {
     /// $`\mathbf{e}_{123}`$.
     #[inline]
     pub fn into_point() -> Point {
-        Point::from(f32x4::set_scalar(1.0))
+        Point::from(f32x4::set0(1.0))
     }
 }
 

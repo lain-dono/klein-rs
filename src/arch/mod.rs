@@ -1,4 +1,5 @@
-#![allow(dead_code, unused_unsafe)]
+#[cfg(target = "aarch64")]
+pub mod neon;
 
 #[macro_use]
 pub mod sse;
@@ -147,15 +148,6 @@ impl f32x4 {
     }
 
     #[inline(always)]
-    pub fn first(self) -> f32 {
-        unsafe {
-            let mut out = 0.0;
-            _mm_store_ss(&mut out, self.0);
-            out
-        }
-    }
-
-    #[inline(always)]
     pub fn from_array(data: [f32; 4]) -> Self {
         Self(unsafe { _mm_loadu_ps(data.as_ptr()) })
     }
@@ -178,24 +170,36 @@ impl f32x4 {
     pub fn from_simd(simd: __m128) -> Self {
         Self(simd)
     }
+}
 
+
+impl f32x4 {
     #[inline(always)]
-    pub fn set_scalar(s: f32) -> Self {
+    pub fn set0(s: f32) -> Self {
         Self(unsafe { _mm_set_ss(s) })
     }
 
     #[inline(always)]
-    pub fn add_scalar(self, other: Self) -> Self {
+    pub fn extract0(self) -> f32 {
+        unsafe {
+            let mut out = 0.0;
+            _mm_store_ss(&mut out, self.0);
+            out
+        }
+    }
+
+    #[inline(always)]
+    pub fn add0(self, other: Self) -> Self {
         Self(unsafe { _mm_add_ss(self.0, other.0) })
     }
 
     #[inline(always)]
-    pub fn sub_scalar(self, other: Self) -> Self {
+    pub fn sub0(self, other: Self) -> Self {
         Self(unsafe { _mm_sub_ss(self.0, other.0) })
     }
 
     #[inline(always)]
-    pub fn mul_scalar(self, other: Self) -> Self {
+    pub fn mul0(self, other: Self) -> Self {
         Self(unsafe { _mm_mul_ss(self.0, other.0) })
     }
 }
@@ -295,6 +299,14 @@ impl f32x4 {
         Self::from(unsafe { _mm_movehdup_ps(self.0) })
     }
 
+    pub fn moveldup(self) -> Self {
+        Self::from(unsafe { _mm_moveldup_ps(self.0) })
+    }
+
+    pub fn movelh(self) -> Self {
+        Self::from(unsafe { _mm_movelh_ps(self.0, self.0) })
+    }
+
     pub fn movehl(self) -> Self {
         Self::from(unsafe { _mm_movehl_ps(self.0, self.0) })
     }
@@ -327,11 +339,11 @@ impl f32x4 {
         Self(unsafe { _mm_castsi128_ps(_mm_set_epi32(a, b, c, d)) })
     }
 
-    pub fn unpackhi(self) -> Self {
+    pub fn unpack_high(self) -> Self {
         Self(unsafe { _mm_unpackhi_ps(self.0, self.0) })
     }
 
-    pub fn unpacklo(self) -> Self {
+    pub fn unpack_low(self) -> Self {
         Self(unsafe { _mm_unpacklo_ps(self.0, self.0) })
     }
 
@@ -340,7 +352,7 @@ impl f32x4 {
             Self(unsafe { _mm_blend_ps(self.0, b.0, 1) })
         } else {
             //self + b
-            self.add_scalar(b)
+            self.add0(b)
         }
     }
 

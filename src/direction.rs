@@ -14,14 +14,12 @@ impl Direction {
         Self::from(f32x4::new(z, y, x, 0.0)).normalized()
     }
 
-    /*
     /// Data should point to four floats with memory layout `(0.0, x, y, z)`
     /// where the zero occupies the lowest address in memory.
-    pub fn load(&mut self, data: [f32; 4]) {
+    pub fn from_array(data: [f32; 4]) -> Self {
         debug_assert_eq!(data[0], 0.0, "Homogeneous coordinate of point data used to initialize a direction must be exactly zero");
-        unsafe { self.p3 = _mm_loadu_ps(data.as_ptr()) }
+        Self::from(f32x4::from_array(data))
     }
-    */
 
     /// Normalize this direction by dividing all components by the magnitude
     /// (by default, `rsqrtps` is used with a single Newton-Raphson refinement iteration)

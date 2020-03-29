@@ -224,6 +224,8 @@ derive_f32x4!(vector add/sub/scale/flip_w for Rotor { p1: f32x4 });
 
 derive_eq!(Motor => motor_eq);
 derive_eq!(Rotor => rotor_eq);
+derive_eq!(Line => line_eq);
+derive_eq!(Plane => plane_eq);
 
 derive_attrs!(struct Direction {
     p3: {1: x, 2: y, 3: z}
