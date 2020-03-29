@@ -46,10 +46,7 @@ impl Translator {
     /// Conjugates a plane $p$ with this translator and returns the result
     /// $tp\widetilde{t}$.
     pub fn conj_plane(&self, p: Plane) -> Plane {
-        Plane::from(crate::arch::sw02(
-            p.p0,
-            self.p2.blend1(f32x4::set0(1.0)),
-        ))
+        Plane::from(crate::arch::sw02(p.p0, self.p2.blend1(f32x4::set0(1.0))))
     }
 
     /// Conjugates a line $`\ell`$ with this translator and returns the result

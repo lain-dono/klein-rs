@@ -2,7 +2,7 @@ use crate::{arch::f32x4, Branch, Dual, IdealLine, Line, Plane, Point};
 
 macro_rules! impl_meet {
     (|$a:ident: $a_ty:ty, $b:ident: $b_ty:ty| -> $output:ty $body:block) => {
-        impl std::ops::BitXor<$b_ty> for $a_ty {
+        impl core::ops::BitXor<$b_ty> for $a_ty {
             type Output = $output;
             #[inline]
             fn bitxor(self, other: $b_ty) -> Self::Output {

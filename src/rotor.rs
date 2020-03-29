@@ -119,9 +119,10 @@ impl Rotor {
     pub fn conj_plane(&self, p: &Plane) -> Plane {
         // NOTE: Conjugation of a plane and point with a rotor is identical
         use core::iter::once;
-        let mut out: Plane = unsafe { core::mem::uninitialized() };
-        crate::arch::sw012(once(&p.p0), self.p1, None, once(&mut out.p0));
-        out
+        crate::arch::sw012(once(p.p0), self.p1, None)
+            .next()
+            .map(|p0| Plane { p0 })
+            .unwrap()
     }
 
     /// Conjugates an array of planes with this rotor in the input array and
@@ -133,14 +134,12 @@ impl Rotor {
     /// When applying a rotor to a list of tightly packed planes, this
     /// routine will be *significantly faster* than applying the rotor to
     /// each plane individually.
-    pub fn conj_plane_slice(&self, input: &[Plane], out: &mut [Plane]) {
+    pub fn conj_plane_slice(
+        &self,
+        input: impl Iterator<Item = Plane>,
+    ) -> impl Iterator<Item = Plane> {
         // NOTE: Conjugation of a plane and point with a rotor is identical
-        crate::arch::sw012(
-            input.iter().map(|d| &d.p0),
-            self.p1,
-            None,
-            out.iter_mut().map(|d| &mut d.p0),
-        )
+        crate::arch::sw012(input.map(|d| d.p0), self.p1, None).map(|p0| Plane { p0 })
     }
 
     pub fn conj_branch(&self, b: Branch) -> Branch {
@@ -153,16 +152,10 @@ impl Rotor {
     /// $`r\ell \widetilde{r}`$.
     pub fn conj_line(&self, l: Line) -> Line {
         use core::iter::once;
-        unsafe {
-            let mut out: Line = unsafe { core::mem::uninitialized() };
-            crate::arch::sw_mm22(
-                once((&l.p1, &l.p2)),
-                self.p1,
-                None,
-                once((&mut out.p1, &mut out.p2)),
-            );
-            out
-        }
+        crate::arch::sw_mm22(once((l.p1, l.p2)), self.p1, None)
+            .map(|(p1, p2)| Line { p1, p2 })
+            .next()
+            .unwrap()
     }
 
     /*
@@ -186,9 +179,10 @@ impl Rotor {
     pub fn conj_point(&self, p: Point) -> Point {
         // NOTE: Conjugation of a plane and point with a rotor is identical
         use core::iter::once;
-        let mut out: Point = unsafe { core::mem::uninitialized() };
-        crate::arch::sw012(once(&p.p3), self.p1, None, once(&mut out.p3));
-        out
+        crate::arch::sw012(once(p.p3), self.p1, None)
+            .next()
+            .map(|p3| Point { p3 })
+            .unwrap()
     }
 
     /// Conjugates an array of points with this rotor in the input array and
@@ -200,24 +194,23 @@ impl Rotor {
     /// When applying a rotor to a list of tightly packed points, this
     /// routine will be *significantly faster* than applying the rotor to
     /// each point individually.
-    pub fn conj_point_slice(&self, input: &[Point], out: &mut [Point]) {
+    pub fn conj_point_slice(
+        &self,
+        input: impl Iterator<Item = Point>,
+    ) -> impl Iterator<Item = Point> {
         // NOTE: Conjugation of a plane and point with a rotor is identical
-        crate::arch::sw012(
-            input.iter().map(|d| &d.p3),
-            self.p1,
-            None,
-            out.iter_mut().map(|d| &mut d.p3),
-        );
+        crate::arch::sw012(input.map(|d| d.p3), self.p1, None).map(|p3| Point { p3 })
     }
 
     /// Conjugates a direction `d` with this rotor and returns the result
     /// $rd\widetilde{r}$.
-    pub fn conj_dir(&self, d: &Direction) -> Direction {
+    pub fn conj_dir(&self, d: Direction) -> Direction {
         use core::iter::once;
-        let mut out: Direction = unsafe { core::mem::uninitialized() };
         // NOTE: Conjugation of a plane and point with a rotor is identical
-        crate::arch::sw012(once(&d.p3), self.p1, None, once(&mut out.p3));
-        out
+        crate::arch::sw012(once(d.p3), self.p1, None)
+            .next()
+            .map(|p3| Direction { p3 })
+            .unwrap()
     }
 
     /// Conjugates an array of directions with this rotor in the input array and
@@ -229,13 +222,11 @@ impl Rotor {
     /// When applying a rotor to a list of tightly packed directions, this
     /// routine will be *significantly faster* than applying the rotor to
     /// each direction individually.
-    pub fn conj_dir_slice(&self, input: &[Direction], out: &mut [Direction]) {
+    pub fn conj_dir_slice(
+        &self,
+        input: impl Iterator<Item = Direction>,
+    ) -> impl Iterator<Item = Direction> {
         // NOTE: Conjugation of a plane and point with a rotor is identical
-        crate::arch::sw012(
-            input.iter().map(|d| &d.p3),
-            self.p1,
-            None,
-            out.iter_mut().map(|d| &mut d.p3),
-        )
+        crate::arch::sw012(input.map(|d| d.p3), self.p1, None).map(|p3| Direction { p3 })
     }
 }

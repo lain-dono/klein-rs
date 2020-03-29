@@ -124,7 +124,7 @@ macro_rules! derive_conv {
 
 macro_rules! derive_eq {
     ($ty:ty => $ty_fn:ident) => {
-        impl std::cmp::PartialEq for $ty {
+        impl core::cmp::PartialEq for $ty {
             #[inline]
             fn eq(&self, other: &Self) -> bool {
                 self.$ty_fn(*other)
@@ -148,7 +148,7 @@ macro_rules! derive_f32x4 {
         derive_debug!($ty { $($field: $simd),+ });
         derive_conv!($ty { $($field:$simd),+ });
 
-        impl std::ops::Add for $ty {
+        impl core::ops::Add for $ty {
             type Output = Self;
             #[inline(always)] fn add(self, rhs: Self) -> Self::Output {
                 Self {
@@ -157,7 +157,7 @@ macro_rules! derive_f32x4 {
             }
         }
 
-        impl std::ops::Sub for $ty {
+        impl core::ops::Sub for $ty {
             type Output = Self;
             #[inline(always)] fn sub(self, rhs: Self) -> Self::Output {
                 Self {
@@ -166,7 +166,7 @@ macro_rules! derive_f32x4 {
             }
         }
 
-        impl std::ops::Mul<f32> for $ty {
+        impl core::ops::Mul<f32> for $ty {
             type Output = Self;
             #[inline(always)]
             fn mul(self, s: f32) -> Self::Output {
@@ -174,7 +174,7 @@ macro_rules! derive_f32x4 {
             }
         }
 
-        impl std::ops::Div<f32> for $ty {
+        impl core::ops::Div<f32> for $ty {
             type Output = Self;
             #[inline(always)]
             fn div(self, s: f32) -> Self::Output {
@@ -185,7 +185,7 @@ macro_rules! derive_f32x4 {
 
     (vector flip_w for $ty:ident { $($field:ident),+ }) => {
         /// Unary minus.
-        impl std::ops::Neg for $ty {
+        impl core::ops::Neg for $ty {
             type Output = Self;
             #[inline]
             fn neg(self) -> Self {
@@ -197,7 +197,7 @@ macro_rules! derive_f32x4 {
 
     (vector flip_xyz for $ty:ident { $($field:ident),+ }) => {
         /// Unary minus (leaves homogeneous coordinate untouched).
-        impl std::ops::Neg for $ty {
+        impl core::ops::Neg for $ty {
             type Output = Self;
             #[inline]
             fn neg(self) -> Self {

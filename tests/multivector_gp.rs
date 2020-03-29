@@ -73,9 +73,9 @@ fn line_normalization() {
 
 #[test]
 fn branch_branch() {
-    let b1 = Branch::new (2.0, 1.0, 3.0);
-    let b2 = Branch::new (1.0, -2.0, -3.0);
-    let r: Rotor  = b2 * b1;
+    let b1 = Branch::new(2.0, 1.0, 3.0);
+    let b2 = Branch::new(1.0, -2.0, -3.0);
+    let r: Rotor = b2 * b1;
     assert_eq!(r.scalar(), 9.0);
     assert_eq!(r.e23(), 3.0);
     assert_eq!(r.e13(), 9.0);

@@ -6,6 +6,7 @@ pub struct Dual {
 }
 
 impl Dual {
+    #[inline]
     pub fn new(p: f32, q: f32) -> Self {
         Self { p, q }
     }
@@ -26,7 +27,7 @@ impl Dual {
     }
 }
 
-impl std::ops::Add for Dual {
+impl core::ops::Add for Dual {
     type Output = Self;
     fn add(self, rhs: Self) -> Self::Output {
         Self {
@@ -36,7 +37,7 @@ impl std::ops::Add for Dual {
     }
 }
 
-impl std::ops::Sub for Dual {
+impl core::ops::Sub for Dual {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self::Output {
         Self {
@@ -46,7 +47,7 @@ impl std::ops::Sub for Dual {
     }
 }
 
-impl std::ops::Mul<f32> for Dual {
+impl core::ops::Mul<f32> for Dual {
     type Output = Self;
     fn mul(self, s: f32) -> Self::Output {
         Self {
@@ -56,7 +57,7 @@ impl std::ops::Mul<f32> for Dual {
     }
 }
 
-impl std::ops::Div<f32> for Dual {
+impl core::ops::Div<f32> for Dual {
     type Output = Self;
     fn div(self, s: f32) -> Self::Output {
         Self {
@@ -66,7 +67,7 @@ impl std::ops::Div<f32> for Dual {
     }
 }
 
-impl std::ops::Neg for Dual {
+impl core::ops::Neg for Dual {
     type Output = Self;
     fn neg(self) -> Self::Output {
         Self {

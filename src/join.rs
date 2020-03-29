@@ -2,7 +2,7 @@ use crate::{Branch, Dual, IdealLine, Line, Plane, Point};
 
 macro_rules! impl_dual {
     (|$a:ident: $a_ty:ty| -> $output:ty $body:block) => {
-        impl std::ops::Not for $a_ty {
+        impl core::ops::Not for $a_ty {
             type Output = $output;
 
             #[inline]
@@ -23,7 +23,7 @@ impl_dual!(|a: Dual| -> Dual { Dual { p: a.q, q: a.p } });
 
 macro_rules! impl_reg {
     (|$a:ident: $a_ty:ty, $b:ident: $b_ty:ty| -> $output:ty $body:block) => {
-        impl std::ops::BitAnd<$b_ty> for $a_ty {
+        impl core::ops::BitAnd<$b_ty> for $a_ty {
             type Output = $output;
 
             #[inline]

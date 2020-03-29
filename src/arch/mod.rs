@@ -20,16 +20,6 @@ impl core::fmt::Debug for f32x4 {
     }
 }
 
-/*
-impl std::ops::Deref for f32x4 {
-    type Target = __m128;
-    #[inline(always)]
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-*/
-
 impl Into<[f32; 4]> for f32x4 {
     #[inline(always)]
     fn into(self) -> [f32; 4] {
@@ -60,7 +50,7 @@ impl Into<__m128> for f32x4 {
 
 macro_rules! impl_bin_add {
     ($op:ident :: $fn:ident => $simd:ident) => {
-        impl std::ops::$op for f32x4 {
+        impl core::ops::$op for f32x4 {
             type Output = Self;
             #[inline(always)]
             fn $fn(self, other: Self) -> Self {
@@ -73,8 +63,11 @@ macro_rules! impl_bin_add {
 impl_bin_add!(Add::add => _mm_add_ps);
 impl_bin_add!(Sub::sub => _mm_sub_ps);
 impl_bin_add!(Mul::mul => _mm_mul_ps);
+impl_bin_add!(BitAnd::bitand => _mm_and_ps);
+impl_bin_add!(BitOr::bitor=> _mm_or_ps);
+impl_bin_add!(BitXor::bitxor=> _mm_xor_ps);
 
-impl std::ops::Mul<f32> for f32x4 {
+impl core::ops::Mul<f32> for f32x4 {
     type Output = Self;
     #[inline(always)]
     fn mul(self, s: f32) -> Self {
@@ -82,36 +75,12 @@ impl std::ops::Mul<f32> for f32x4 {
     }
 }
 
-impl std::ops::Div<f32> for f32x4 {
+impl core::ops::Div<f32> for f32x4 {
     type Output = Self;
     #[inline(always)]
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn div(self, s: f32) -> Self {
         self * Self::all(s).rcp_nr1()
-    }
-}
-
-impl std::ops::BitAnd for f32x4 {
-    type Output = Self;
-    #[inline(always)]
-    fn bitand(self, other: Self) -> Self {
-        Self(unsafe { _mm_and_ps(self.0, other.0) })
-    }
-}
-
-impl std::ops::BitOr for f32x4 {
-    type Output = Self;
-    #[inline(always)]
-    fn bitor(self, other: Self) -> Self {
-        Self(unsafe { _mm_or_ps(self.0, other.0) })
-    }
-}
-
-impl std::ops::BitXor for f32x4 {
-    type Output = Self;
-    #[inline(always)]
-    fn bitxor(self, other: Self) -> Self {
-        Self(unsafe { _mm_xor_ps(self.0, other.0) })
     }
 }
 
@@ -171,7 +140,6 @@ impl f32x4 {
         Self(simd)
     }
 }
-
 
 impl f32x4 {
     #[inline(always)]

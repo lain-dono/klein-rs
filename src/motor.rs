@@ -190,12 +190,11 @@ impl Motor {
     /// Conjugates a plane $p$ with this motor and returns the result
     /// $mp\widetilde{m}$.
     pub fn conj_plane(self, p: Plane) -> Plane {
-        unsafe {
-            use core::iter::once;
-            let mut out: Plane = core::mem::uninitialized();
-            crate::arch::sw012(once(&p.p0), self.p1, Some(&self.p2), once(&mut out.p0));
-            out
-        }
+        use core::iter::once;
+        crate::arch::sw012(once(p.p0), self.p1, Some(&self.p2))
+            .next()
+            .map(|p0| Plane { p0 })
+            .unwrap()
     }
 
     /// Conjugates an array of planes with this motor in the input array and
@@ -207,31 +206,18 @@ impl Motor {
     /// When applying a motor to a list of tightly packed planes, this
     /// routine will be *significantly faster* than applying the motor to
     /// each plane individually.
-    pub fn conj_planes(&self, input: &[Point], out: &mut [Point]) {
-        unsafe {
-            crate::arch::sw012(
-                input.iter().map(|d| &d.p3),
-                self.p1,
-                Some(&self.p2),
-                out.iter_mut().map(|d| &mut d.p3),
-            );
-        }
+    pub fn conj_planes(&self, input: impl Iterator<Item = Point>) -> impl Iterator<Item = Point> {
+        crate::arch::sw012(input.map(|d| d.p3), self.p1, Some(&self.p2)).map(|p3| Point { p3 })
     }
 
     /// Conjugates a line $`\ell`$ with this motor and returns the result
     /// $`m\ell \widetilde{m}`$.
     pub fn conj_line(&self, l: Line) -> Line {
         use core::iter::once;
-        unsafe {
-            let mut out: Line = unsafe { core::mem::uninitialized() };
-            crate::arch::sw_mm22(
-                once((&l.p1, &l.p2)),
-                self.p1,
-                Some(&self.p2),
-                once((&mut out.p1, &mut out.p2)),
-            );
-            out
-        }
+        crate::arch::sw_mm22(once((l.p1, l.p2)), self.p1, Some(&self.p2))
+            .map(|(p1, p2)| Line { p1, p2 })
+            .next()
+            .unwrap()
     }
 
     /*

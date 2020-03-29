@@ -2,7 +2,7 @@ use crate::{arch::f32x4, Branch, Dual, Line, Motor, Plane, Point, Rotor, Transla
 
 macro_rules! impl_gp {
     (|$a:ident: $a_ty:ty, $b:ident: $b_ty:ty| -> $output:ty $body:block) => {
-        impl std::ops::Mul<$b_ty> for $a_ty {
+        impl core::ops::Mul<$b_ty> for $a_ty {
             type Output = $output;
 
             #[inline]
@@ -14,7 +14,7 @@ macro_rules! impl_gp {
             }
         }
 
-        impl std::ops::Div<$b_ty> for $a_ty {
+        impl core::ops::Div<$b_ty> for $a_ty {
             type Output = $output;
 
             #[inline]

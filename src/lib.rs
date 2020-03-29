@@ -57,11 +57,11 @@
 //!
 //!     // In practice, this should be cached whenever possible.
 //!     let step: Line = (b * a.reversed()).log();
-//! 
+//!
 //!     // exp(log(m)) = exp(t*log(m) + (1 - t)*log(m))
 //!     // = exp(t*(log(m))) * exp((1 - t)*log(m))
 //!     let step = step * t;
-//! 
+//!
 //!     // The exponential of the step here can be cached if the blend occurs
 //!     // with fixed steps toward the final motor. Compose the interpolated
 //!     // result with the start motor to produce the intermediate blended motor.
@@ -452,9 +452,8 @@
 #[macro_use]
 pub mod arch;
 
-
-mod join; // f32x4
 mod exp_log; // f32x4
+mod join; // f32x4
 mod multivector_ep;
 mod multivector_gp; // f32x4
 mod multivector_ip; // f32x4

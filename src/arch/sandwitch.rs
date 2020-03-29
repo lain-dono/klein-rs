@@ -11,8 +11,7 @@
 // 3. For efficiency, the sandwich operator is NOT implemented in terms of two
 //    geometric products and a reversion. The result is nevertheless equivalent.
 
-use super::{f32x4, sse::*};
-use core::arch::x86_64::*;
+use super::f32x4;
 
 // Partition memory layouts
 //     LSB --> MSB
@@ -201,8 +200,6 @@ pub fn sw32(a: f32x4, b: f32x4) -> f32x4 {
 // out points to the start of an array of motor outputs (alternating p1 and p2)
 //
 // Note: in and out are permitted to alias iff a == out.
-
-//template <bool Variadic, bool Translate, bool InputP2>
 pub fn sw_mm11(input: impl Iterator<Item = f32x4>, b: f32x4) -> impl Iterator<Item = f32x4> {
     // p1 block
     // a0(b0^2 + b1^2 + b2^2 + b3^2) +
@@ -267,12 +264,11 @@ pub fn sw_mm11(input: impl Iterator<Item = f32x4>, b: f32x4) -> impl Iterator<It
     })
 }
 
-pub fn sw_mm22<'a>(
-    input: impl Iterator<Item = (&'a f32x4, &'a f32x4)>,
+pub fn sw_mm22(
+    input: impl Iterator<Item = (f32x4, f32x4)>,
     b: f32x4,
-    c: Option<&'a f32x4>,
-    output: impl Iterator<Item = (&'a mut f32x4, &'a mut f32x4)>,
-) {
+    c: Option<&f32x4>,
+) -> impl Iterator<Item = (f32x4, f32x4)> {
     // p1 block
     // a0(b0^2 + b1^2 + b2^2 + b3^2) +
     // (a1(b1^2 + b0^2 - b3^2 - b2^2) +
@@ -360,26 +356,26 @@ pub fn sw_mm22<'a>(
         unsafe { core::mem::uninitialized() }
     };
 
-    for ((&p1_in, &p2_in), output) in input.zip(output) {
-        let (p1_out, p2_out) = (output.0, output.1);
-
+    input.map(move |(p1_in, p2_in)| {
         let p1_in_xzwy = shuffle!(p1_in, [1, 3, 2, 0]);
         let p1_in_xwyz = shuffle!(p1_in, [2, 1, 3, 0]);
 
         let p2_in_xzwy = shuffle!(p2_in, [1, 3, 2, 0]);
         let p2_in_xwyz = shuffle!(p2_in, [2, 1, 3, 0]);
 
-        *p1_out = tmp * p1_in + tmp2 * p1_in_xzwy + tmp3 * p1_in_xwyz;
-        *p2_out = tmp * p2_in + tmp2 * p2_in_xzwy + tmp3 * p2_in_xwyz;
+        let p1_out = tmp * p1_in + tmp2 * p1_in_xzwy + tmp3 * p1_in_xwyz;
+        let p2_out = tmp * p2_in + tmp2 * p2_in_xzwy + tmp3 * p2_in_xwyz;
 
         // If what is being applied is a rotor, the non-directional
         // components of the line are left untouched
-        if translate {
-            *p2_out = *p2_out + tmp4 * p1_in;
-            *p2_out = *p2_out + tmp5 * p1_in_xwyz;
-            *p2_out = *p2_out + tmp6 * p1_in_xzwy;
-        }
-    }
+        let p2_out = if translate {
+            p2_out + tmp4 * p1_in + tmp5 * p1_in_xwyz + tmp6 * p1_in_xzwy
+        } else {
+            p2_out
+        };
+
+        (p1_out, p2_out)
+    })
 }
 
 // Apply a motor to a plane
@@ -391,12 +387,11 @@ pub fn sw_mm22<'a>(
 // equivalent to __m128[count]
 //template <bool Variadic = false, bool Translate = true>
 #[inline(always)]
-pub fn sw012<'a>(
-    a: impl Iterator<Item = &'a f32x4>,
+pub fn sw012(
+    a: impl Iterator<Item = f32x4>,
     b: f32x4,
     c: Option<&f32x4>,
-    out: impl Iterator<Item = &'a mut f32x4>,
-) {
+) -> impl Iterator<Item = f32x4> {
     // LSB
     //
     // (2a3(b0 c3 + b1 c2 + b3 c0 - b2 c1) +
@@ -425,75 +420,62 @@ pub fn sw012<'a>(
     // similarly to the manner in which it is displaced after application of
     // a translator.
 
-    unsafe {
-        // Double-cover scale
-        let dc_scale = _mm_set_ps(2.0, 2.0, 2.0, 1.0);
-        let b_xwyz = swizzle!(b.0, 2, 1, 3, 0);
-        let b_xzwy = swizzle!(b.0, 1, 3, 2, 0);
-        let b_xxxx = swizzle!(b.0, 0, 0, 0, 0);
+    // Double-cover scale
+    let dc_scale = f32x4::new(2.0, 2.0, 2.0, 1.0);
+    let b_xwyz = shuffle!(b, [2, 1, 3, 0]);
+    let b_xzwy = shuffle!(b, [1, 3, 2, 0]);
+    let b_xxxx = shuffle!(b, [0, 0, 0, 0]);
 
-        let tmp1 = _mm_mul_ps(swizzle!(b.0, 0, 0, 0, 2), swizzle!(b.0, 2, 1, 3, 2));
-        let tmp1 = _mm_add_ps(
-            tmp1,
-            _mm_mul_ps(swizzle!(b.0, 1, 3, 2, 1), swizzle!(b.0, 3, 2, 1, 1)),
-        );
-        // Scale later with (a0, a2, a3, a1)
-        let tmp1 = _mm_mul_ps(tmp1, dc_scale);
+    let tmp1 = shuffle!(b, [0, 0, 0, 2]) * shuffle!(b, [2, 1, 3, 2]);
+    let tmp1 = tmp1 + shuffle!(b, [1, 3, 2, 1]) * shuffle!(b, [3, 2, 1, 1]);
+    // Scale later with (a0, a2, a3, a1)
+    let tmp1 = tmp1 * dc_scale;
 
-        let tmp2 = _mm_mul_ps(b.0, b_xwyz);
+    let tmp2 =
+        b * b_xwyz - (f32x4::set0(-0.0) ^ (shuffle!(b, [0, 0, 0, 3]) * shuffle!(b, [1, 3, 2, 3])));
+    // Scale later with (a0, a3, a1, a2)
+    let tmp2 = tmp2 * dc_scale;
 
-        let tmp2 = _mm_sub_ps(
-            tmp2,
-            _mm_xor_ps(
-                _mm_set_ss(-0.0),
-                _mm_mul_ps(swizzle!(b.0, 0, 0, 0, 3), swizzle!(b.0, 1, 3, 2, 3)),
-            ),
-        );
-        // Scale later with (a0, a3, a1, a2)
-        let tmp2 = _mm_mul_ps(tmp2, dc_scale);
+    // Alternately add and subtract to improve low component stability
+    let tmp3 = b * b;
+    let tmp3 = tmp3 - b_xwyz * b_xwyz;
+    let tmp3 = tmp3 + b_xxxx * b_xxxx;
+    let tmp3 = tmp3 - b_xzwy * b_xzwy;
+    // Scale later with a
 
-        // Alternately add and subtract to improve low component stability
-        let tmp3 = _mm_mul_ps(b.0, b.0);
-        let tmp3 = _mm_sub_ps(tmp3, _mm_mul_ps(b_xwyz, b_xwyz));
-        let tmp3 = _mm_add_ps(tmp3, _mm_mul_ps(b_xxxx, b_xxxx));
-        let tmp3 = _mm_sub_ps(tmp3, _mm_mul_ps(b_xzwy, b_xzwy));
-        // Scale later with a
+    // Compute
+    // 0 * _ +
+    // 2a1(b0 c1 + b2 c3 + b1 c0 - b3 c2) +
+    // 2a2(b0 c2 + b3 c1 + b2 c0 - b1 c3) +
+    // 2a3(b0 c3 + b1 c2 + b3 c0 - b2 c1)
+    // by decomposing into four vectors, factoring out the a components
 
-        // Compute
-        // 0 * _ +
-        // 2a1(b0 c1 + b2 c3 + b1 c0 - b3 c2) +
-        // 2a2(b0 c2 + b3 c1 + b2 c0 - b1 c3) +
-        // 2a3(b0 c3 + b1 c2 + b3 c0 - b2 c1)
-        // by decomposing into four vectors, factoring out the a components
+    let translate = c.is_some();
+    let tmp4 = if let Some(&c) = c {
+        let tmp4 = b_xxxx * c;
+        let tmp4 = tmp4 + b_xzwy * shuffle!(c, [2, 1, 3, 0]);
+        let tmp4 = tmp4 + b * shuffle!(c, [0, 0, 0, 0]);
 
-        let translate = c.is_some();
-        let tmp4 = if let Some(c) = c {
-            let tmp4 = _mm_mul_ps(b_xxxx, c.0);
-            let tmp4 = _mm_add_ps(tmp4, _mm_mul_ps(b_xzwy, swizzle!(c.0, 2, 1, 3, 0)));
-            let tmp4 = _mm_add_ps(tmp4, _mm_mul_ps(b.0, swizzle!(c.0, 0, 0, 0, 0)));
+        // NOTE: The high component of tmp4 is meaningless here
+        let tmp4 = tmp4 - b_xwyz * shuffle!(c, [1, 3, 2, 0]);
+        tmp4 * dc_scale
+    } else {
+        unsafe { core::mem::uninitialized() }
+    };
 
-            // NOTE: The high component of tmp4 is meaningless here
-            let tmp4 = _mm_sub_ps(tmp4, _mm_mul_ps(b_xwyz, swizzle!(c.0, 1, 3, 2, 0)));
-            _mm_mul_ps(tmp4, dc_scale)
+    // The temporaries (tmp1, tmp2, tmp3, tmp4)
+    // strictly only have a dependence on b and c.
+
+    a.map(move |a| {
+        // Compute the lower block for components e1, e2, and e3
+        let p = tmp1 * shuffle!(a, [1, 3, 2, 0]) + tmp2 * shuffle!(a, [2, 1, 3, 0]) + tmp3 * a;
+
+        if translate {
+            p + f32x4::hi_dp(tmp4, a)
         } else {
-            core::mem::uninitialized()
-        };
-
-        // The temporaries (tmp1, tmp2, tmp3, tmp4)
-        // strictly only have a dependence on b and c.
-
-        for (a, p) in a.zip(out) {
-            // Compute the lower block for components e1, e2, and e3
-            p.0 = _mm_mul_ps(tmp1, swizzle!(a.0, 1, 3, 2, 0));
-            p.0 = _mm_add_ps(p.0, _mm_mul_ps(tmp2, swizzle!(a.0, 2, 1, 3, 0)));
-            p.0 = _mm_add_ps(p.0, _mm_mul_ps(tmp3, a.0));
-
-            if translate {
-                let tmp5 = hi_dp(tmp4.into(), *a).0;
-                p.0 = _mm_add_ps(p.0, tmp5);
-            }
+            p
         }
-    }
+    })
 }
 
 // Apply a motor to a point
@@ -529,54 +511,52 @@ pub fn sw312<'a>(
     // note that for a normalized rotor and homogenous point, the e123
     // component will remain unity.
 
-    unsafe {
-        let two = _mm_set_ps(2.0, 2.0, 2.0, 0.0);
-        let b_xxxx = swizzle!(b.0, 0, 0, 0, 0);
-        let b_xwyz = swizzle!(b.0, 2, 1, 3, 0);
-        let b_xzwy = swizzle!(b.0, 1, 3, 2, 0);
+    let two = f32x4::new(2.0, 2.0, 2.0, 0.0);
+    let b_xxxx = shuffle!(b, [0, 0, 0, 0]);
+    let b_xwyz = shuffle!(b, [2, 1, 3, 0]);
+    let b_xzwy = shuffle!(b, [1, 3, 2, 0]);
 
-        let tmp1 = _mm_mul_ps(b.0, b_xwyz);
-        let tmp1 = _mm_sub_ps(tmp1, _mm_mul_ps(b_xxxx, b_xzwy));
-        let tmp1 = _mm_mul_ps(tmp1, two);
-        // tmp1 needs to be scaled by (_, a3, a1, a2)
+    let tmp1 = b * b_xwyz;
+    let tmp1 = tmp1 - b_xxxx * b_xzwy;
+    let tmp1 = tmp1 * two;
+    // tmp1 needs to be scaled by (_, a3, a1, a2)
 
-        let tmp2 = _mm_mul_ps(b_xxxx, b_xwyz);
-        let tmp2 = _mm_add_ps(tmp2, _mm_mul_ps(b_xzwy, b.0));
-        let tmp2 = _mm_mul_ps(tmp2, two);
-        // tmp2 needs to be scaled by (_, a2, a3, a1)
+    let tmp2 = b_xxxx * b_xwyz;
+    let tmp2 = tmp2 + b_xzwy * b;
+    let tmp2 = tmp2 * two;
+    // tmp2 needs to be scaled by (_, a2, a3, a1)
 
-        let tmp3 = _mm_mul_ps(b.0, b.0);
-        let b_tmp = swizzle!(b.0, 0, 0, 0, 1);
-        let tmp3 = _mm_add_ps(tmp3, _mm_mul_ps(b_tmp, b_tmp));
-        let b_tmp = swizzle!(b.0, 2, 1, 3, 2);
-        let tmp4 = _mm_mul_ps(b_tmp, b_tmp);
-        let b_tmp = swizzle!(b.0, 1, 3, 2, 3);
-        let tmp4 = _mm_add_ps(tmp4, _mm_mul_ps(b_tmp, b_tmp));
-        let tmp3 = _mm_sub_ps(tmp3, _mm_xor_ps(tmp4, _mm_set_ss(-0.0)));
-        // tmp3 needs to be scaled by (a0, a1, a2, a3)
+    let tmp3 = b * b;
+    let b_tmp = shuffle!(b, [0, 0, 0, 1]);
+    let tmp3 = tmp3 + b_tmp * b_tmp;
+    let b_tmp = shuffle!(b, [2, 1, 3, 2]);
+    let tmp4 = b_tmp * b_tmp;
+    let b_tmp = shuffle!(b, [1, 3, 2, 3]);
+    let tmp4 = tmp4 + b_tmp * b_tmp;
+    let tmp3 = tmp3 - (tmp4 ^ f32x4::set0(-0.0));
+    // tmp3 needs to be scaled by (a0, a1, a2, a3)
 
-        let translate = c.is_some();
-        let tmp4 = if let Some(c) = c {
-            let tmp4 = _mm_mul_ps(b_xzwy, swizzle!(c.0, 2, 1, 3, 0));
-            let tmp4 = _mm_sub_ps(tmp4, _mm_mul_ps(b_xxxx, c.0));
-            let tmp4 = _mm_sub_ps(tmp4, _mm_mul_ps(b_xwyz, swizzle!(c.0, 1, 3, 2, 0)));
-            let tmp4 = _mm_sub_ps(tmp4, _mm_mul_ps(b.0, swizzle!(c.0, 0, 0, 0, 0)));
+    let translate = c.is_some();
+    let tmp4 = if let Some(&c) = c {
+        let tmp4 = b_xzwy * shuffle!(c, [2, 1, 3, 0]);
+        let tmp4 = tmp4 - b_xxxx * c;
+        let tmp4 = tmp4 - b_xwyz * shuffle!(c, [1, 3, 2, 0]);
+        let tmp4 = tmp4 - b * shuffle!(c, [0, 0, 0, 0]);
 
-            // Mask low component and scale other components by 2
-            // tmp4 needs to be scaled by (_, a0, a0, a0)
-            _mm_mul_ps(tmp4, two)
-        } else {
-            core::mem::uninitialized()
-        };
+        // Mask low component and scale other components by 2
+        // tmp4 needs to be scaled by (_, a0, a0, a0)
+        tmp4 * two
+    } else {
+        unsafe { core::mem::uninitialized() }
+    };
 
-        for (a, p) in a.zip(out) {
-            p.0 = _mm_mul_ps(tmp1, swizzle!(a.0, 2, 1, 3, 0));
-            p.0 = _mm_add_ps(p.0, _mm_mul_ps(tmp2, swizzle!(a.0, 1, 3, 2, 0)));
-            p.0 = _mm_add_ps(p.0, _mm_mul_ps(tmp3, a.0));
+    for (&a, p) in a.zip(out) {
+        *p = tmp1 * shuffle!(a, [2, 1, 3, 0]);
+        *p = *p + tmp2 * shuffle!(a, [1, 3, 2, 0]);
+        *p = *p + tmp3 * a;
 
-            if translate {
-                p.0 = _mm_add_ps(p.0, _mm_mul_ps(tmp4, swizzle!(a.0, 0, 0, 0, 0)));
-            }
+        if translate {
+            *p = *p + tmp4 * shuffle!(a, [0, 0, 0, 0]);
         }
     }
 }

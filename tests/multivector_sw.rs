@@ -110,23 +110,23 @@ fn translator_line() {
 
 #[test]
 fn construct_motor() {
-    let  r = Rotor::new (FRAC_PI_2, 0.0, 0.0, 1.0);
-    let t = Translator::new (1.0, 0.0, 0.0, 1.0);
-    let m: Motor  = r * t;
-    let p1 = Point::new (1.0, 0.0, 0.0);
+    let r = Rotor::new(FRAC_PI_2, 0.0, 0.0, 1.0);
+    let t = Translator::new(1.0, 0.0, 0.0, 1.0);
+    let m: Motor = r * t;
+    let p1 = Point::new(1.0, 0.0, 0.0);
     let p2 = m.conj_point(p1);
     assert_eq!(p2.x(), 0.0);
     abs_diff_eq!(p2.y(), 1.0);
     abs_diff_eq!(p2.z(), 1.0);
 
     // Rotation and translation about the same axis commutes
-    let m  = t * r;
+    let m = t * r;
     let p2 = m.conj_point(p1);
     assert_eq!(p2.x(), 0.0);
     abs_diff_eq!(p2.y(), 1.0);
     abs_diff_eq!(p2.z(), 1.0);
 
-    let l: Line  = m.log();
+    let l: Line = m.log();
     assert_eq!(l.e23(), 0.0);
     abs_diff_eq!(l.e12(), -0.7854, epsilon = 0.001);
     assert_eq!(l.e31(), 0.0);
@@ -209,9 +209,9 @@ fn motor_point_variadic() {
 #[test]
 //#[ignore]
 fn motor_line() {
-    let m = Motor::new (2.0, 4.0, 3.0, -1.0, -5.0, -2.0, 2.0, -3.0);
+    let m = Motor::new(2.0, 4.0, 3.0, -1.0, -5.0, -2.0, 2.0, -3.0);
     // a*e01 + b*e01 + c*e02 + d*e23 + e*e31 + f*e12
-    let l1 = Line::new (-1.0, 2.0, -3.0, -6.0, 5.0, 4.0);
+    let l1 = Line::new(-1.0, 2.0, -3.0, -6.0, 5.0, 4.0);
     let l2 = m.conj_line(l1);
     assert_eq!(l2.e01(), 6.0);
     assert_eq!(l2.e02(), 522.0);

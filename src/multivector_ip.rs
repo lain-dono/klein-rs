@@ -2,7 +2,7 @@ use crate::{arch::f32x4, IdealLine, Line, Plane, Point};
 
 macro_rules! impl_dot {
     (|$a:ident: $a_ty:ty, $b:ident: $b_ty:ty| -> $output:ty $body:block) => {
-        impl std::ops::BitOr<$b_ty> for $a_ty {
+        impl core::ops::BitOr<$b_ty> for $a_ty {
             type Output = $output;
 
             #[inline]
@@ -16,7 +16,9 @@ macro_rules! impl_dot {
 }
 
 impl_dot!(|a: Plane, b: Plane| -> f32 { f32x4::hi_dp(a.p0, b.p0).extract0() });
-impl_dot!(|a: Line, b: Line| -> f32 { (f32x4::all(-0.0) ^ f32x4::hi_dp_ss(a.p1, b.p1)).extract0() });
+impl_dot!(|a: Line, b: Line| -> f32 {
+    (f32x4::all(-0.0) ^ f32x4::hi_dp_ss(a.p1, b.p1)).extract0()
+});
 impl_dot!(|a: Point, b: Point| -> f32 {
     // -a0 b0
     (f32x4::all(-1.0) * (a.p3 * b.p3)).extract0()
@@ -35,7 +37,6 @@ impl_dot!(|a: Plane, b: Line| -> Plane {
     Plane::from(p0)
 });
 impl_dot!(|b: Line, a: Plane| -> Plane {
-
     // (a1 c1 + a2 c2 + a3 c3) e0 +
     // (a1 b2 - a2 b1) e3
     // (a2 b3 - a3 b2) e1 +

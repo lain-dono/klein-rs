@@ -1,5 +1,5 @@
-use klein::{IdealLine, Line, Plane, Point};
 use approx::abs_diff_eq;
+use klein::{IdealLine, Line, Plane, Point};
 
 // plane|plane
 #[test]
