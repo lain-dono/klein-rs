@@ -480,12 +480,11 @@ pub fn sw012(
 
 // Apply a motor to a point
 //template <bool Variadic, bool Translate>
-pub fn sw312<'a>(
-    a: impl Iterator<Item = &'a f32x4>,
+pub fn sw312(
+    a: impl Iterator<Item = f32x4>,
     b: f32x4,
-    c: Option<&'a f32x4>,
-    out: impl Iterator<Item = &'a mut f32x4>,
-) {
+    c: Option<&f32x4>,
+) -> impl Iterator<Item = f32x4> {
     // LSB
     // a0(b1^2 + b0^2 + b2^2 + b3^2) e123 +
     //
@@ -550,15 +549,15 @@ pub fn sw312<'a>(
         unsafe { core::mem::uninitialized() }
     };
 
-    for (&a, p) in a.zip(out) {
-        *p = tmp1 * shuffle!(a, [2, 1, 3, 0]);
-        *p = *p + tmp2 * shuffle!(a, [1, 3, 2, 0]);
-        *p = *p + tmp3 * a;
+    a.map(move |a| {
+        let p = tmp1 * shuffle!(a, [2, 1, 3, 0]) + tmp2 * shuffle!(a, [1, 3, 2, 0]) + tmp3 * a;
 
         if translate {
-            *p = *p + tmp4 * shuffle!(a, [0, 0, 0, 0]);
+            p + tmp4 * shuffle!(a, [0, 0, 0, 0])
+        } else {
+            p
         }
-    }
+    })
 }
 
 // Conjugate origin with motor. Unlike other operations the motor MUST be

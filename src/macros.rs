@@ -13,11 +13,7 @@ macro_rules! derive_attrs {
             $(
                 #[inline]
                 pub fn $field (self) -> [f32; 4] {
-                    unsafe {
-                        let mut out = [0.0; 4];
-                        _mm_store_ps(out.as_mut_ptr(), self.$field.into());
-                        out
-                    }
+                    self.$field.into_array()
                 }
 
                 $( derive_attrs! { _attr $field $attr $i } )+
@@ -28,11 +24,7 @@ macro_rules! derive_attrs {
     (_attr $field:ident $attr:ident 0) => {
         #[inline]
         pub fn $attr (self) -> f32 {
-            unsafe {
-                let mut out = 0.0;
-                _mm_store_ss(&mut out, self.$field);
-                out
-            }
+            self.$field.extract0()
         }
     };
 

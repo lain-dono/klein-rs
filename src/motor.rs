@@ -241,9 +241,10 @@ impl Motor {
     #[inline]
     pub fn conj_point(&self, p: Point) -> Point {
         use core::iter::once;
-        let mut out: Point = unsafe { core::mem::uninitialized() };
-        crate::arch::sw312(once(&p.p3), self.p1, Some(&self.p2), once(&mut out.p3));
-        out
+        crate::arch::sw312(once(p.p3), self.p1, Some(&self.p2))
+            .map(|p3| Point { p3 })
+            .next()
+            .unwrap()
     }
 
     /// Conjugates an array of points with this motor in the input array and
@@ -255,13 +256,8 @@ impl Motor {
     ///     When applying a motor to a list of tightly packed points, this
     ///     routine will be *significantly faster* than applying the motor to
     ///     each point individually.
-    pub fn conj_points(&self, input: &[Point], output: &mut [Point]) {
-        crate::arch::sw312(
-            input.iter().map(|p| &p.p3),
-            self.p1,
-            Some(&self.p2),
-            output.iter_mut().map(|p| &mut p.p3),
-        )
+    pub fn conj_points(&self, input: impl Iterator<Item = Point>) -> impl Iterator<Item = Point> {
+        crate::arch::sw312(input.map(|p| p.p3), self.p1, Some(&self.p2)).map(|p3| Point { p3 })
     }
 
     /// Conjugates the origin $`O`$ with this motor and returns the result
@@ -277,10 +273,10 @@ impl Motor {
     /// to the translational invariance of directions (points at infinity).
     pub fn conj_dir(&self, d: Direction) -> Direction {
         use core::iter::once;
-
-        let mut out = Direction::new(0.0, 0.0, 0.0);
-        crate::arch::sw312(once(&d.p3), self.p1, None, once(&mut out.p3));
-        out
+        crate::arch::sw312(once(d.p3), self.p1, None)
+            .map(|p3| Direction { p3 })
+            .next()
+            .unwrap()
     }
 
     /// Conjugates an array of directions with this motor in the input array and
@@ -295,12 +291,10 @@ impl Motor {
     /// When applying a motor to a list of tightly packed directions, this
     /// routine will be *significantly faster* than applying the motor to
     /// each direction individually.
-    pub fn conj_dirs(&self, input: &[Direction], output: &mut [Direction]) {
-        crate::arch::sw312(
-            input.iter().map(|d| &d.p3),
-            self.p1,
-            None,
-            output.iter_mut().map(|d| &mut d.p3),
-        )
+    pub fn conj_dirs(
+        &self,
+        input: impl Iterator<Item = Direction>,
+    ) -> impl Iterator<Item = Direction> {
+        crate::arch::sw312(input.map(|d| d.p3), self.p1, None).map(|p3| Direction { p3 })
     }
 }
