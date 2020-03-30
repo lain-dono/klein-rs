@@ -23,7 +23,7 @@ impl IdealLine {
 
     /// Reversion operator
     pub fn reverse(&mut self) {
-        self.p2 = self.p2 ^ f32x4::new(-0.0, -0.0, -0.0, 0.0);
+        self.p2 ^= f32x4::new(-0.0, -0.0, -0.0, 0.0);
     }
 
     pub fn reversed(mut self) -> Self {
@@ -90,7 +90,7 @@ impl Branch {
 
     pub fn normalize(&mut self) {
         let inv_norm = f32x4::hi_dp_bc(self.p1, self.p1).rsqrt_nr1();
-        self.p1 = self.p1 * inv_norm;
+        self.p1 *= inv_norm;
     }
 
     pub fn normalized(mut self) -> Self {
@@ -100,9 +100,9 @@ impl Branch {
 
     pub fn invert(&mut self) {
         let inv_norm = f32x4::hi_dp_bc(self.p1, self.p1).rsqrt_nr1();
-        self.p1 = self.p1 * inv_norm;
-        self.p1 = self.p1 * inv_norm;
-        self.p1 = f32x4::new(-0.0, -0.0, -0.0, 0.0) ^ self.p1;
+        self.p1 *= inv_norm;
+        self.p1 *= inv_norm;
+        self.p1 ^= f32x4::new(-0.0, -0.0, -0.0, 0.0);
     }
 
     pub fn inverse(mut self) -> Self {
@@ -111,7 +111,7 @@ impl Branch {
     }
 
     pub fn reverse(&mut self) {
-        self.p1 = self.p1 ^ f32x4::new(-0.0, -0.0, -0.0, 0.0);
+        self.p1 ^= f32x4::new(-0.0, -0.0, -0.0, 0.0);
     }
 
     pub fn reversed(mut self) -> Self {
@@ -191,7 +191,7 @@ impl Line {
 
         // p1 * (s + t e0123) = s * p1 - t p1_perp
         self.p2 = self.p2 * s - self.p1 * t;
-        self.p1 = self.p1 * s;
+        self.p1 *= s;
     }
 
     /// Return a normalized copy of this line
@@ -226,8 +226,8 @@ impl Line {
 
     pub fn reverse(&mut self) {
         let flip = f32x4::new(-0.0, -0.0, -0.0, 0.0);
-        self.p1 = self.p1 ^ flip;
-        self.p2 = self.p2 ^ flip;
+        self.p1 ^= flip;
+        self.p2 ^= flip;
     }
 
     pub fn reversed(mut self) -> Self {

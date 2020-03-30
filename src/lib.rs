@@ -1,5 +1,3 @@
-#![allow(unused_doc_comments)]
-
 //! # Quick start
 //!
 //! Here's a simple snippet to get you started:
@@ -446,7 +444,7 @@
 //! translators and motors.
 
 #![feature(stdarch)]
-#![allow(deprecated, non_snake_case, unused_unsafe)]
+#![allow(deprecated, non_snake_case, unused_doc_comments)]
 #![warn(clippy::all)]
 
 #[macro_use]

@@ -48,12 +48,10 @@ macro_rules! derive_debug {
 
 macro_rules! derive_conv {
     ($ty:ident { $a:ident: $simd:ty }) => {
-        derive_conv!(__m128  $ty { $a });
         derive_conv!(f32x4  $ty { $a });
     };
 
     ($ty:ident { $a:ident: $simd:ty, $b:ident: $simd2:ty }) => {
-        derive_conv!(__m128  $ty { $a, $b });
         derive_conv!(f32x4  $ty { $a, $b });
     };
 
@@ -62,7 +60,7 @@ macro_rules! derive_conv {
         impl From<$simd> for $ty {
             #[inline(always)]
             fn from($a: $simd) -> Self {
-                Self { $a: $a.into() }
+                Self { $a: $a }
             }
         }
 
@@ -70,7 +68,7 @@ macro_rules! derive_conv {
         impl Into<$simd> for $ty {
             #[inline(always)]
             fn into(self) -> $simd {
-                self.$a.into()
+                self.$a
             }
         }
     };
@@ -80,7 +78,7 @@ macro_rules! derive_conv {
         impl From<($simd, $simd)> for $ty {
             #[inline(always)]
             fn from(($a, $b): ($simd, $simd)) -> Self {
-                Self { $a: $a.into(), $b: $b.into() }
+                Self { $a: $a, $b: $b }
             }
         }
 
@@ -88,7 +86,7 @@ macro_rules! derive_conv {
         impl Into<($simd, $simd)> for $ty {
             #[inline(always)]
             fn into(self) -> ($simd, $simd) {
-                (self.$a.into(), self.$b.into())
+                (self.$a, self.$b)
             }
         }
     };
@@ -202,7 +200,6 @@ macro_rules! derive_f32x4 {
 
 use crate::arch::f32x4;
 use crate::{Branch, Direction, IdealLine, Line, Motor, Plane, Point, Rotor, Translator};
-use core::arch::x86_64::*;
 
 derive_f32x4!(vector add/sub/scale/flip_w for Direction { p3: f32x4 });
 derive_f32x4!(vector add/sub/scale for Translator { p2: f32x4 });

@@ -45,7 +45,7 @@ impl Plane {
             .rsqrt_nr1()
             .blend1(f32x4::set0(1.0));
 
-        self.p0 = inv_norm * self.p0;
+        self.p0 *= inv_norm;
     }
 
     /// Return a normalized copy of this plane.
@@ -66,7 +66,8 @@ impl Plane {
 
     pub fn invert(&mut self) {
         let inv_norm = f32x4::hi_dp_bc(self.p0, self.p0).rsqrt_nr1();
-        self.p0 = self.p0 * inv_norm * inv_norm;
+        self.p0 *= inv_norm;
+        self.p0 *= inv_norm;
     }
 
     pub fn inverse(mut self) -> Self {

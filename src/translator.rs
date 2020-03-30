@@ -35,7 +35,7 @@ impl Translator {
     }
 
     pub fn invert(&mut self) {
-        self.p2 = f32x4::new(-0.0, -0.0, -0.0, 0.0) ^ self.p2;
+        self.p2 ^= f32x4::new(-0.0, -0.0, -0.0, 0.0);
     }
 
     pub fn inverse(mut self) -> Self {
@@ -58,6 +58,6 @@ impl Translator {
     /// Conjugates a point $p$ with this translator and returns the result
     /// $`tp\widetilde{t}`$.
     pub fn conj_point(&self, p: Point) -> Point {
-        Point::from(crate::arch::sw32(p.p3, self.p2).0)
+        Point::from(crate::arch::sw32(p.p3, self.p2))
     }
 }

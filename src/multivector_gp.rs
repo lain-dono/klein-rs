@@ -273,9 +273,9 @@ pub fn gp33(a: f32x4, b: f32x4) -> f32x4 {
     let tmp = tmp + a * shuffle!(b, [0, 0, 0, 0]);
 
     // (0, 1, 2, 3) -> (0, 0, 2, 2)
-    let ss = tmp.moveldup().movelh();
+    let ss = tmp.moveldup();
 
-    (tmp * ss.rcp_nr1()).blend_and()
+    (tmp * ss.copy_low_high(ss).rcp_nr1()).blend_and()
 }
 
 pub fn gp_dl(u: f32, v: f32, b: f32x4, c: f32x4) -> (f32x4, f32x4) {

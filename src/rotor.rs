@@ -25,7 +25,7 @@ impl Rotor {
 
     #[doc(hidden)]
     pub fn raw(a: f32, b: f32, c: f32, d: f32) -> Self {
-        Self::from(f32x4::new(a, b, c, d).0)
+        Self::from(f32x4::new(a, b, c, d))
     }
 
     /// Fast load operation for packed data that is already normalized. The
@@ -45,7 +45,7 @@ impl Rotor {
     pub fn normalize(&mut self) {
         // A rotor is normalized if r * r.reverse() is unity.
         let inv_norm = f32x4::dp_bc(self.p1, self.p1).rsqrt_nr1();
-        self.p1 = self.p1 * inv_norm;
+        self.p1 *= inv_norm;
     }
 
     /// Return a normalized copy of this rotor
@@ -56,9 +56,9 @@ impl Rotor {
 
     pub fn invert(&mut self) {
         let inv_norm = f32x4::hi_dp_bc(self.p1, self.p1).rsqrt_nr1();
-        self.p1 = self.p1 * inv_norm;
-        self.p1 = self.p1 * inv_norm;
-        self.p1 = f32x4::new(-0.0, -0.0, -0.0, 0.0) ^ self.p1;
+        self.p1 *= inv_norm;
+        self.p1 *= inv_norm;
+        self.p1 ^= f32x4::new(-0.0, -0.0, -0.0, 0.0);
     }
 
     pub fn inverse(mut self) -> Self {
@@ -69,7 +69,7 @@ impl Rotor {
     /// Constrains the rotor to traverse the shortest arc
     pub fn constrain(&mut self) {
         let mask = shuffle!(self.p1 & f32x4::set0(-0.0), [0, 0, 0, 0]);
-        self.p1 = mask ^ self.p1;
+        self.p1 ^= mask;
     }
 
     pub fn constrained(mut self) -> Self {
@@ -78,7 +78,7 @@ impl Rotor {
     }
 
     pub fn reverse(&mut self) {
-        self.p1 = self.p1 ^ f32x4::new(-0.0, -0.0, -0.0, 0.0);
+        self.p1 ^= f32x4::new(-0.0, -0.0, -0.0, 0.0);
     }
 
     pub fn reversed(mut self) -> Self {

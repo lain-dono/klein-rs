@@ -254,8 +254,7 @@ pub fn log(p1: f32x4, p2: f32x4) -> (f32x4, f32x4) {
     // (u + v e0123) * n is the logarithm. To proceed, we need to compute
     // the normalized bivector.
     let norm_real = a * a2_sqrt_rcp;
-    let norm_ideal = b * a2_sqrt_rcp;
-    let norm_ideal = norm_ideal - a * ab * a2_sqrt_rcp * a2.rcp_nr1();
+    let norm_ideal = b * a2_sqrt_rcp - a * ab * a2_sqrt_rcp * a2.rcp_nr1();
 
     let uvec = f32x4::all(u);
     let p1 = uvec * norm_real;

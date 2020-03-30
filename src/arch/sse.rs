@@ -50,7 +50,7 @@ pub fn hi_dp_ss(a: f32x4, b: f32x4) -> f32x4 {
     let out = sum + out.unpack_low();
 
     // (1 + 2 + 3, _, _, _)
-    out.movehl()
+    out.copy_high_low(out)
 }
 
 #[inline(always)]
@@ -73,9 +73,7 @@ pub fn hi_dp(a: f32x4, b: f32x4) -> f32x4 {
         let out = sum + out.unpack_low();
 
         // (1 + 2 + 3, _, _, _)
-        let out = out.movehl();
-
-        out & f32x4::cast_i32(0, 0, 0, -1)
+        out.copy_high_low(out) & f32x4::cast_i32(0, 0, 0, -1)
     }
 }
 
@@ -112,7 +110,7 @@ pub fn dp(a: f32x4, b: f32x4) -> f32x4 {
         // (a1 b1, a2 b2, a3 b3, 0) + (a2 b2, a2 b2, 0, 0)
         // = (a1 b1 + a2 b2, _, a3 b3, 0)
         let out = hi + out;
-        let out = out.add0(hi.movehl_ps(out));
+        let out = out.add0(hi.copy_high_low(out));
 
         out & f32x4::cast_i32(0, 0, 0, -1)
     }
@@ -130,7 +128,7 @@ pub fn dp_bc(a: f32x4, b: f32x4) -> f32x4 {
         // (a1 b1, a2 b2, a3 b3, 0) + (a2 b2, a2 b2, 0, 0)
         // = (a1 b1 + a2 b2, _, a3 b3, 0)
         let out = hi + out;
-        let out = out.add0(hi.movehl_ps(out));
+        let out = out.add0(hi.copy_high_low(out));
 
         shuffle!(out, [0, 0, 0, 0])
     }

@@ -48,7 +48,7 @@ impl Point {
 
     /// Normalize this point (division is done via rcpps with an additional Newton-Raphson refinement).
     pub fn normalize(&mut self) {
-        self.p3 = self.p3 * shuffle!(self.p3, [0, 0, 0, 0]).rcp_nr1();
+        self.p3 *= shuffle!(self.p3, [0, 0, 0, 0]).rcp_nr1();
     }
 
     /// Return a normalized copy of this point.
@@ -59,8 +59,8 @@ impl Point {
 
     pub fn invert(&mut self) {
         let inv_norm = shuffle!(self.p3, [0, 0, 0, 0]).rcp_nr1();
-        self.p3 = inv_norm * self.p3;
-        self.p3 = inv_norm * self.p3;
+        self.p3 *= inv_norm;
+        self.p3 *= inv_norm;
     }
 
     pub fn inverse(mut self) -> Self {
@@ -69,7 +69,7 @@ impl Point {
     }
 
     pub fn reversed(&mut self) {
-        self.p3 = self.p3 ^ f32x4::all(-0.0);
+        self.p3 ^= f32x4::all(-0.0);
     }
 
     pub fn reverse(mut self) -> Self {

@@ -30,13 +30,6 @@ impl Motor {
         };
 
         (dual * l).exp()
-
-        /*
-        line log_m;
-        detail::gpDL(
-            , , l.p1, l.p2, log_m.p1_, log_m.p2_);
-        detail::exp(log_m.p1_, log_m.p2_, p1_, p2_);
-        */
     }
 
     #[inline]
@@ -97,7 +90,7 @@ impl Motor {
         // (s c3 - t b3) e03
 
         self.p2 = self.p2 * s - ((self.p1 * t) ^ f32x4::set0(-0.0));
-        self.p1 = self.p1 * s;
+        self.p1 *= s;
     }
 
     /// Return a normalized copy of this motor.
@@ -121,9 +114,8 @@ impl Motor {
         // (the scalar component above needs to be negated)
         // p2 * (s + t e0123)^2 = s^2 p2 NOTE: s^2 = b2_inv
         let st = self.p1 * s * t;
-        self.p2 = (self.p2 * b2_inv) - ((st + st) ^ f32x4::set0(-0.0));
-        self.p2 = self.p2 ^ neg;
 
+        self.p2 = ((self.p2 * b2_inv) - ((st + st) ^ f32x4::set0(-0.0))) ^ neg;
         self.p1 = (self.p1 * b2_inv) ^ neg;
     }
 
@@ -135,8 +127,8 @@ impl Motor {
     /// Constrains the motor to traverse the shortest arc
     pub fn constrain(&mut self) {
         let mask = shuffle!(self.p1 & f32x4::set0(-0.0), [0, 0, 0, 0]);
-        self.p1 = mask ^ self.p1;
-        self.p2 = mask ^ self.p2;
+        self.p1 ^= mask;
+        self.p2 ^= mask;
     }
 
     pub fn constrained(mut self) -> Self {
@@ -146,8 +138,8 @@ impl Motor {
 
     pub fn reverse(&mut self) {
         let flip = f32x4::new(-0.0, -0.0, -0.0, 0.0);
-        self.p1 = self.p1 ^ flip;
-        self.p2 = self.p2 ^ flip;
+        self.p1 ^= flip;
+        self.p2 ^= flip;
     }
 
     pub fn reversed(mut self) -> Self {
@@ -251,11 +243,11 @@ impl Motor {
     /// stores the result in the output array. Aliasing is only permitted when
     /// `in == out` (in place motor application).
     ///
-    /// !!! tip
+    /// # tip
     ///
-    ///     When applying a motor to a list of tightly packed points, this
-    ///     routine will be *significantly faster* than applying the motor to
-    ///     each point individually.
+    /// When applying a motor to a list of tightly packed points, this
+    /// routine will be *significantly faster* than applying the motor to
+    /// each point individually.
     pub fn conj_points(&self, input: impl Iterator<Item = Point>) -> impl Iterator<Item = Point> {
         crate::arch::sw312(input.map(|p| p.p3), self.p1, Some(&self.p2)).map(|p3| Point { p3 })
     }

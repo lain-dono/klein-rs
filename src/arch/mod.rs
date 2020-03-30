@@ -1,6 +1,3 @@
-#[cfg(target = "aarch64")]
-pub mod neon;
-
 #[macro_use]
 pub mod sse;
 
@@ -34,38 +31,32 @@ impl From<[f32; 4]> for f32x4 {
     }
 }
 
-impl From<__m128> for f32x4 {
-    #[inline(always)]
-    fn from(xmm: __m128) -> Self {
-        Self(xmm)
-    }
-}
-
-impl Into<__m128> for f32x4 {
-    #[inline(always)]
-    fn into(self) -> __m128 {
-        self.0
-    }
-}
-
 macro_rules! impl_bin_add {
-    ($op:ident :: $fn:ident => $simd:ident) => {
+    ($op:ident :: $fn:ident $op_assign:ident :: $fn_assign:ident => $simd:ident) => {
         impl core::ops::$op for f32x4 {
             type Output = Self;
             #[inline(always)]
+            #[must_use]
             fn $fn(self, other: Self) -> Self {
                 Self(unsafe { $simd(self.0, other.0) })
+            }
+        }
+
+        impl core::ops::$op_assign for f32x4 {
+            #[inline(always)]
+            fn $fn_assign(&mut self, other: Self) {
+                self.0 = unsafe { $simd(self.0, other.0) };
             }
         }
     };
 }
 
-impl_bin_add!(Add::add => _mm_add_ps);
-impl_bin_add!(Sub::sub => _mm_sub_ps);
-impl_bin_add!(Mul::mul => _mm_mul_ps);
-impl_bin_add!(BitAnd::bitand => _mm_and_ps);
-impl_bin_add!(BitOr::bitor=> _mm_or_ps);
-impl_bin_add!(BitXor::bitxor=> _mm_xor_ps);
+impl_bin_add!(Add::add AddAssign::add_assign => _mm_add_ps);
+impl_bin_add!(Sub::sub SubAssign::sub_assign => _mm_sub_ps);
+impl_bin_add!(Mul::mul MulAssign::mul_assign => _mm_mul_ps);
+impl_bin_add!(BitAnd::bitand BitAndAssign::bitand_assign => _mm_and_ps);
+impl_bin_add!(BitOr::bitor BitOrAssign::bitor_assign => _mm_or_ps);
+impl_bin_add!(BitXor::bitxor BitXorAssign::bitxor_assign => _mm_xor_ps);
 
 impl core::ops::Mul<f32> for f32x4 {
     type Output = Self;
@@ -128,16 +119,6 @@ impl f32x4 {
             _mm_store_ps(out.as_mut_ptr(), self.0);
             out
         }
-    }
-
-    #[inline(always)]
-    pub fn into_simd(self) -> __m128 {
-        self.0
-    }
-
-    #[inline(always)]
-    pub fn from_simd(simd: __m128) -> Self {
-        Self(simd)
     }
 }
 
@@ -264,23 +245,19 @@ impl f32x4 {
     }
 
     pub fn movehdup(self) -> Self {
-        Self::from(unsafe { _mm_movehdup_ps(self.0) })
+        Self(unsafe { _mm_movehdup_ps(self.0) })
     }
 
     pub fn moveldup(self) -> Self {
-        Self::from(unsafe { _mm_moveldup_ps(self.0) })
+        Self(unsafe { _mm_moveldup_ps(self.0) })
     }
 
-    pub fn movelh(self) -> Self {
-        Self::from(unsafe { _mm_movelh_ps(self.0, self.0) })
+    pub fn copy_low_high(self, b: Self) -> Self {
+        Self(unsafe { _mm_movelh_ps(self.0, b.0) })
     }
 
-    pub fn movehl(self) -> Self {
-        Self::from(unsafe { _mm_movehl_ps(self.0, self.0) })
-    }
-
-    pub fn movehl_ps(self, b: Self) -> Self {
-        Self::from(unsafe { _mm_movehl_ps(self.0, b.0) })
+    pub fn copy_high_low(self, b: Self) -> Self {
+        Self(unsafe { _mm_movehl_ps(self.0, b.0) })
     }
 
     pub fn dp(a: Self, b: Self) -> Self {
